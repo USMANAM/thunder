@@ -33,8 +33,6 @@ export const addPlugin = async (options: {
 
   if (!Options.name) throw new Error("Plugin name is required");
 
-  const pluginsDir = join(Deno.cwd(), "plugins");
-
   const resolvedPluginName = resolvePluginName(Options.name);
 
   const GitRepoUrl = new URL(resolvedPluginName, "https://github.com");
@@ -44,12 +42,12 @@ export const addPlugin = async (options: {
     "submodule",
     "add",
     GitRepoUrl.toString(),
-    join(pluginsDir, Options.name),
+    join("./plugins", Options.name),
   ];
 
   console.log("Executing command:", command.join(" "));
 
-  await sh(command);
+  await sh(command, { cwd: Deno.cwd() });
 
   console.log("Success");
 };
