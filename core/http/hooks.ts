@@ -1,4 +1,5 @@
 import { expandGlob } from "@std/fs";
+import { join } from "@std/path/join";
 
 export type THook = {
   priority?: number;
@@ -17,17 +18,20 @@ export type THook = {
 
 let hooks: THook[] | undefined;
 
-export const loadHooks = async (path: string) => {
+export const loadHooks = async (
+  root: string,
+  globPattern: string,
+) => {
   if (hooks !== undefined) return hooks;
 
   hooks = [];
 
   for await (
-    const entry of expandGlob(path, {
+    const entry of expandGlob(globPattern, {
       followSymlinks: true,
       canonicalize: true,
       globstar: true,
-      root: Deno.cwd(),
+      root: join(Deno.cwd(), root),
     })
   ) {
     if (entry.isFile) {

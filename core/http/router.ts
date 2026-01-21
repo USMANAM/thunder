@@ -1,9 +1,6 @@
-import { join } from "@std/path/join";
 import z, { ZodError, ZodObject } from "zod";
 import { match, MatchFunction, pathToRegexp } from "path-to-regexp";
-import { basename } from "@std/path/basename";
-import { loadHooks, THook } from "./hooks.ts";
-import { Logger } from "../common/logger.ts";
+import { THook } from "./hooks.ts";
 
 export type TResponse = Response | Promise<Response>;
 export type THandler = (req: Request) => TResponse;
@@ -24,67 +21,68 @@ export type TPrepareHandler = () => TPreparedHandler;
 export type TMethod = "get" | "post" | "patch" | "put" | "delete" | "all";
 export type TRouteExecutor = (req: Request) => Promise<Response> | Response;
 
-export class Router {
-  constructor(public name: string) {}
+export type TRegisterMethod = (
+  path: string,
+  prepare: TPrepareHandler,
+) => Router;
 
+export class Router {
   protected routesTree: {
     [K in TMethod]?: Map<RegExp, {
-      path: string;
+      endpoint: string;
       prepare: TPrepareHandler;
       parser: MatchFunction<Record<string, string>>;
     }>;
   } = {};
 
-  public all(
+  constructor(
+    protected root: string,
+    protected registerFn: (method: Record<TMethod, TRegisterMethod>) => void,
+  ) {
+    if (!registerFn.name) {
+      throw new Error("A named function should be passed to router!");
+    }
+
+    // deno-lint-ignore no-explicit-any
+    registerFn(this as any);
+  }
+
+  protected registerMethod(
     path: string,
     prepare: TPrepareHandler,
     method?: TMethod,
   ) {
     const routes = this.routesTree[method ?? "all"] ??= new Map();
+    const endpoint = `/${
+      (this.root + path).split("/").filter(Boolean).join("/")
+    }`;
 
-    routes.set(pathToRegexp(path).regexp, {
-      path,
+    routes.set(pathToRegexp(endpoint).regexp, {
+      endpoint,
       prepare,
-      parser: match<Record<string, string>>(path),
+      parser: match<Record<string, string>>(endpoint),
     });
 
     return this;
   }
 
-  public get(
-    path: string,
-    prepare: TPrepareHandler,
-  ) {
-    return this.all(path, prepare, "get");
-  }
+  protected get: TRegisterMethod = (path, prepare) =>
+    this.registerMethod(path, prepare, "get");
 
-  public post(
-    path: string,
-    prepare: TPrepareHandler,
-  ) {
-    return this.all(path, prepare, "post");
-  }
+  protected post: TRegisterMethod = (path, prepare) =>
+    this.registerMethod(path, prepare, "post");
 
-  public patch(
-    path: string,
-    prepare: TPrepareHandler,
-  ) {
-    return this.all(path, prepare, "patch");
-  }
+  protected patch: TRegisterMethod = (path, prepare) =>
+    this.registerMethod(path, prepare, "patch");
 
-  public put(
-    path: string,
-    prepare: TPrepareHandler,
-  ) {
-    return this.all(path, prepare, "put");
-  }
+  protected put: TRegisterMethod = (path, prepare) =>
+    this.registerMethod(path, prepare, "put");
 
-  public delete(
-    path: string,
-    prepare: TPrepareHandler,
-  ) {
-    return this.all(path, prepare, "delete");
-  }
+  protected delete: TRegisterMethod = (path, prepare) =>
+    this.registerMethod(path, prepare, "delete");
+
+  protected all: TRegisterMethod = (path, prepare) =>
+    this.registerMethod(path, prepare);
 
   public match(method: TMethod, endpoint: string) {
     const mainRoutes = this.routesTree[method];
@@ -105,7 +103,7 @@ export class Router {
                 for (const hook of hooks) {
                   if (typeof hook.pre === "function") {
                     const hookRes = await hook.pre(
-                      this.name,
+                      this.registerFn.name,
                       prepare.name,
                       req,
                     );
@@ -129,7 +127,7 @@ export class Router {
                 for (const hook of hooks) {
                   if (typeof hook.post === "function") {
                     const hookRes = await hook.post(
-                      this.name,
+                      this.registerFn.name,
                       prepare.name,
                       req,
                       res,
@@ -158,129 +156,3 @@ export class Router {
     }
   }
 }
-
-// Cache for resolved route import paths
-const routePathCache = new Map<string, string | null>();
-
-// Resolve and cache the import path for a given URL pathname
-const resolveRoutePath = async (
-  pathname: string,
-  apiPath: string,
-  apiBasename: string,
-): Promise<{ importPath: string; remainingParts: string[] } | null> => {
-  // Check cache first
-  const cacheKey = pathname;
-  const cached = routePathCache.get(cacheKey);
-  if (cached !== undefined) {
-    if (cached === null) return null;
-    // Parse cached value back
-    const [importPath, ...remainingParts] = cached.split("|");
-    return { importPath, remainingParts: remainingParts.filter(Boolean) };
-  }
-
-  const pathnameParts = pathname
-    .replace(`/${apiBasename}/`, "")
-    .split("/")
-    .filter(Boolean);
-
-  const importPathParts = ["api"];
-
-  while (pathnameParts.length) {
-    if (importPathParts.length > 5) {
-      routePathCache.set(cacheKey, null);
-      return null;
-    }
-
-    const part = pathnameParts.shift()!;
-
-    const settlements = await Promise.allSettled([
-      Deno.stat(join(Deno.cwd(), ...importPathParts, part)),
-      Deno.stat(join(Deno.cwd(), ...importPathParts, part + ".ts")),
-    ]);
-
-    const settled = settlements.find((_) => _.status === "fulfilled");
-
-    if (!settled) {
-      routePathCache.set(cacheKey, null);
-      return null;
-    }
-
-    importPathParts.push(part);
-
-    if (settled.value.isFile) {
-      break;
-    }
-  }
-
-  const importPath = importPathParts.length === 1
-    ? `${apiPath}/index`
-    : importPathParts.join("/");
-
-  // Cache the result: importPath|remaining|parts
-  routePathCache.set(cacheKey, [importPath, ...pathnameParts].join("|"));
-
-  return { importPath, remainingParts: pathnameParts };
-};
-
-export const matchRoute = async (
-  req: Request,
-  opts?: {
-    api?: string;
-    hooks?: string;
-  },
-): Promise<TRouteExecutor | undefined> => {
-  const url = new URL(req.url);
-
-  const apiPath = opts?.api ?? "api";
-  const hooksPath = opts?.hooks ?? "hooks";
-
-  const apiBasename = basename(apiPath);
-
-  if (new RegExp(`\\/${apiBasename}\\/.*`).test(url.pathname)) {
-    const resolved = await resolveRoutePath(url.pathname, apiPath, apiBasename);
-
-    if (!resolved) throw new Error("Invalid path");
-
-    const { importPath, remainingParts } = resolved;
-
-    const mod = await import(`../../${importPath}.ts`);
-
-    const router = mod.default;
-
-    if (router instanceof Router) {
-      const exec = router.match(
-        req.method.toLowerCase() as TMethod,
-        `/${remainingParts.join("/") ?? ""}`,
-      );
-
-      if (!exec) return;
-
-      return async (req: Request) => {
-        const res = await exec(
-          req,
-          ...(await loadHooks(join(hooksPath, "./**/*.ts"))),
-        );
-
-        const log = (() => {
-          switch (true) {
-            case res.status < 299:
-              return Logger.success;
-            case res.status < 399:
-              return Logger.info;
-            case res.status < 499:
-              return Logger.warn;
-
-            default:
-              return Logger.error;
-          }
-        })();
-
-        log.bind(Logger)(req.method.toUpperCase(), req.url, res.status);
-
-        return res;
-      };
-    }
-
-    throw new Error("Not a valid router");
-  }
-};

@@ -1,13 +1,12 @@
-import { serveAssets } from "@/core/middlewares/serveAssets.ts";
-import { matchRoute } from "@/core/http/router.ts";
+import { discover } from "@/core/http/discover.ts";
 
 export default async (req: Request) => {
-  const exec = await matchRoute(req, {
+  const exec = await discover(req, {
     api: "./api",
     hooks: "./hooks",
-  }).catch(console.error);
+  });
 
   if (typeof exec === "function") return exec(req);
 
-  return serveAssets(req);
+  return new Response("Not found", { status: 404 });
 };
