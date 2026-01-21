@@ -6,7 +6,5 @@ export default async (req: Request) => {
     hooks: "./hooks",
   });
 
-  if (typeof exec === "function") return exec(req);
-
-  return new Response("Not found", { status: 404 });
+  return exec(req);
 };

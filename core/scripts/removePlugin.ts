@@ -44,27 +44,27 @@ export const removePlugin = async (options: {
 
   await sh(gitRm, { cwd: Deno.cwd() });
 
-  await Deno.remove(`.git/modules/${pluginPath}`, { recursive: true });
-
-  await Promise.all(
+  await Promise.allSettled(
     [
-      join(Deno.cwd(), "./api", Options.name),
-      join(Deno.cwd(), "./hooks", Options.name),
-    ].map((path) =>
-      Deno.remove(path, {
-        recursive: true,
-      })
-    ),
-  );
-
-  await writeJSONFile(
-    denoConfigPath,
-    {
-      ...denoConfig,
-      workspace: denoConfig.workspace?.filter((i) =>
-        i !== `./plugins/${Options.name}`
+      Deno.remove(`.git/modules/${pluginPath}`, { recursive: true }),
+      ...[
+        join(Deno.cwd(), "./api", Options.name),
+        join(Deno.cwd(), "./hooks", Options.name),
+      ].map((path) =>
+        Deno.remove(path, {
+          recursive: true,
+        })
       ),
-    },
+      writeJSONFile(
+        denoConfigPath,
+        {
+          ...denoConfig,
+          workspace: denoConfig.workspace?.filter((i) =>
+            i !== `./plugins/${Options.name}`
+          ),
+        },
+      ),
+    ],
   );
 
   console.log("Success");

@@ -1,16 +1,18 @@
-import z, { ZodError, ZodObject } from "zod";
-import { match, MatchFunction, pathToRegexp } from "path-to-regexp";
+import z, { ZodError } from "zod";
+import { match, MatchFunction } from "path-to-regexp";
 import { THook } from "./hooks.ts";
+import { paramsMap } from "./constants.ts";
+import { Env, EnvType } from "../common/env.ts";
 
 export type TResponse = Response | Promise<Response>;
 export type THandler = (req: Request) => TResponse;
 export type TNextFunction = () => TResponse;
 export type TMiddleware = (req: Request, next: TNextFunction) => TResponse;
 export type THandlerIOShapes = () => {
-  params: ZodObject;
-  query: ZodObject;
-  body: ZodObject;
-  return: ZodObject;
+  params: z.ZodType;
+  query: z.ZodType;
+  body: z.ZodType;
+  return: z.ZodType;
 };
 export type THandlerOpts = {
   shape?: THandlerIOShapes;
@@ -28,9 +30,10 @@ export type TRegisterMethod = (
 
 export class Router {
   protected routesTree: {
-    [K in TMethod]?: Map<RegExp, {
+    [K in TMethod]?: Map<string, {
+      name: string;
       endpoint: string;
-      prepare: TPrepareHandler;
+      handler: TPreparedHandler;
       parser: MatchFunction<Record<string, string>>;
     }>;
   } = {};
@@ -52,14 +55,21 @@ export class Router {
     prepare: TPrepareHandler,
     method?: TMethod,
   ) {
+    if (!prepare.name) {
+      throw new Error("A named function should be passed to route handler!");
+    }
+
     const routes = this.routesTree[method ?? "all"] ??= new Map();
     const endpoint = `/${
       (this.root + path).split("/").filter(Boolean).join("/")
     }`;
 
-    routes.set(pathToRegexp(endpoint).regexp, {
+    if (routes.has(endpoint)) return this;
+
+    routes.set(endpoint, {
+      name: prepare.name,
       endpoint,
-      prepare,
+      handler: prepare(),
       parser: match<Record<string, string>>(endpoint),
     });
 
@@ -94,17 +104,17 @@ export class Router {
 
     for (const routes of [mainRoutes, otherRoutes]) {
       if (routes) {
-        for (const [regex, { prepare, parser }] of routes) {
-          if (regex.test(endpoint)) {
-            const handlerOpts = prepare();
+        for (const [, { name, handler, parser }] of routes) {
+          const match = parser(endpoint);
 
+          if (match) {
             return async (req: Request, ...hooks: THook[]) => {
               try {
                 for (const hook of hooks) {
                   if (typeof hook.pre === "function") {
                     const hookRes = await hook.pre(
                       this.registerFn.name,
-                      prepare.name,
+                      name,
                       req,
                     );
 
@@ -112,23 +122,21 @@ export class Router {
                   }
                 }
 
-                // deno-lint-ignore ban-ts-comment
-                // @ts-ignore
-                req._params = parser(endpoint).params;
+                paramsMap.set(req, match.params);
 
                 let res: Response;
 
-                if (typeof handlerOpts === "function") {
-                  res = await handlerOpts(req);
+                if (typeof handler === "function") {
+                  res = await handler(req);
                 } else {
-                  res = await handlerOpts.handler(req);
+                  res = await handler.handler(req);
                 }
 
                 for (const hook of hooks) {
                   if (typeof hook.post === "function") {
                     const hookRes = await hook.post(
                       this.registerFn.name,
-                      prepare.name,
+                      name,
                       req,
                       res,
                     );
@@ -146,7 +154,15 @@ export class Router {
                 }
 
                 return Response.json({
-                  error,
+                  error: error instanceof Error
+                    ? {
+                      message: error.message,
+                      name: error.name,
+                      stack: Env.is(EnvType.DEVELOPMENT)
+                        ? error.stack
+                        : undefined,
+                    }
+                    : error,
                 }, { status: 500 });
               }
             };

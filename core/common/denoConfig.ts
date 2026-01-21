@@ -1,4 +1,5 @@
 import { join } from "@std/path/join";
+import { toFileUrl } from "@std/path/to-file-url";
 
 export interface IDenoConfig {
   name?: string;
@@ -16,7 +17,7 @@ export interface IDenoConfig {
 export const denoConfigPath = join(Deno.cwd(), "deno.json");
 
 export const denoConfig: IDenoConfig = (
-  await import(`file:///${denoConfigPath}`, {
+  await import(toFileUrl(denoConfigPath).href, {
     with: { type: "json" },
   })
 ).default;

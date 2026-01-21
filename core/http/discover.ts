@@ -9,45 +9,50 @@ export const discover = async (
     api?: string;
     hooks?: string;
   },
-): Promise<TRouteExecutor | undefined> => {
+): Promise<TRouteExecutor> => {
   const url = new URL(req.url);
 
   const apiPath = opts?.api ?? "api";
   const hooksPath = opts?.hooks ?? "hooks";
 
-  const [namespace, ...endpointParts] = url.pathname.split("/").filter(
+  const pathnameParts = url.pathname.split("/").filter(
     Boolean,
   );
+  const [namespace, ...endpointParts] = pathnameParts;
 
-  const mod = await loadRoutes(
+  const { fallback, module } = await loadRoutes(
     apiPath,
     `./**/*.ts`,
     namespace + ".ts",
   );
 
-  const router = mod.default;
+  const router = module.default;
 
   if (typeof router?.match === "function") {
+    const resolvedEndpoint = fallback
+      ? `/${pathnameParts.join("/") ?? ""}`
+      : `/${endpointParts.join("/") ?? ""}`;
+
     const exec = router.match(
       req.method.toLowerCase() as TMethod,
-      `/${endpointParts.join("/") ?? ""}`,
+      resolvedEndpoint,
     );
 
-    if (!exec) return;
-
     return async (req: Request) => {
-      const res = await exec(
-        req,
-        ...(await loadHooks(hooksPath, "./**/*.ts")),
-      );
+      const res = typeof exec === "function"
+        ? await exec(
+          req,
+          ...(await loadHooks(hooksPath, "./**/*.ts")),
+        )
+        : new Response("Not found", { status: 404 });
 
       const log = (() => {
         switch (true) {
-          case res.status < 299:
+          case res.status < 300:
             return Logger.success;
-          case res.status < 399:
+          case res.status < 400:
             return Logger.info;
-          case res.status < 499:
+          case res.status < 500:
             return Logger.warn;
 
           default:

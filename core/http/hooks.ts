@@ -1,5 +1,6 @@
 import { expandGlob } from "@std/fs";
 import { join } from "@std/path/join";
+import { toFileUrl } from "@std/path/to-file-url";
 
 export type THook = {
   priority?: number;
@@ -16,35 +17,41 @@ export type THook = {
   ) => Response | void | Promise<Response | void>;
 };
 
-let hooks: THook[] | undefined;
+// Cache the loading promise, not the result - prevents race conditions
+let hooksPromise: Promise<THook[]> | undefined;
 
-export const loadHooks = async (
+export const loadHooks = (
   root: string,
   globPattern: string,
-) => {
-  if (hooks !== undefined) return hooks;
+): Promise<THook[]> => {
+  if (hooksPromise !== undefined) return hooksPromise;
 
-  hooks = [];
+  // Store the promise immediately so concurrent calls await the same promise
+  hooksPromise = (async () => {
+    const hooks: THook[] = [];
 
-  for await (
-    const entry of expandGlob(globPattern, {
-      followSymlinks: true,
-      canonicalize: true,
-      globstar: true,
-      root: join(Deno.cwd(), root),
-    })
-  ) {
-    if (entry.isFile) {
-      const mod = await import(`file:///${entry.path}`);
+    for await (
+      const entry of expandGlob(globPattern, {
+        followSymlinks: true,
+        canonicalize: true,
+        globstar: true,
+        root: join(Deno.cwd(), root),
+      })
+    ) {
+      if (entry.isFile) {
+        const mod = await import(toFileUrl(entry.path).href);
 
-      if (
-        typeof mod.default === "object" &&
-        ("pre" in mod.default || "post" in mod.default)
-      ) hooks.push(mod.default);
+        if (
+          typeof mod.default === "object" &&
+          ("pre" in mod.default || "post" in mod.default)
+        ) hooks.push(mod.default);
+      }
     }
-  }
 
-  hooks.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    hooks.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
-  return hooks;
+    return hooks;
+  })();
+
+  return hooksPromise;
 };

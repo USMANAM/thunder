@@ -22,7 +22,7 @@ export class Logger {
     nativeLogFunction: (...args: unknown[]) => void,
     ...args: unknown[]
   ) {
-    if (Env.is(EnvType.PRODUCTION)) return;
+    if (Env.is(EnvType.PRODUCTION) && type !== LogType.ERROR) return;
 
     const color = COLORS[type];
     const timestamp = new Date().toISOString();

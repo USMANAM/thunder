@@ -1,5 +1,5 @@
 import { parseArgs as parse } from "@std/cli/parse-args";
-import { dirname, join } from "@std/path";
+import { dirname, join, toFileUrl } from "@std/path";
 import { deepMerge } from "@std/collections";
 import { existsSync, expandGlob } from "@std/fs";
 import { printStream } from "./lib/utility.ts";
@@ -11,7 +11,7 @@ export const getDenoConfig = async () => {
   const MainConfigPath = join(Deno.cwd(), "deno.json");
 
   return (
-    await import(`file:///${MainConfigPath}`, {
+    await import(toFileUrl(MainConfigPath).href, {
       with: { type: "json" },
     })
   ).default;
@@ -21,7 +21,7 @@ export const mergeDenoConfig = async (dir: string) => {
   const TempConfigPath = join(dir, "deno.json");
 
   const TempConfig = (
-    await import(`file:///${TempConfigPath}`, {
+    await import(toFileUrl(TempConfigPath).href, {
       with: { type: "json" },
     })
   ).default;
