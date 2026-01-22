@@ -29,14 +29,18 @@ export type TRegisterMethod = (
 ) => Router;
 
 export class Router {
-  protected routesTree: {
-    [K in TMethod]?: Map<string, {
-      name: string;
-      endpoint: string;
-      handler: TPreparedHandler;
+  protected registry: Map<
+    string,
+    {
       parser: MatchFunction<Record<string, string>>;
-    }>;
-  } = {};
+      methods: {
+        [K in TMethod]?: {
+          name: string;
+          handler: TPreparedHandler;
+        };
+      };
+    }
+  > = new Map();
 
   constructor(
     protected root: string,
@@ -59,19 +63,33 @@ export class Router {
       throw new Error("A named function should be passed to route handler!");
     }
 
-    const routes = this.routesTree[method ?? "all"] ??= new Map();
+    const resolvedMethod = method || "all";
     const endpoint = `/${
       (this.root + path).split("/").filter(Boolean).join("/")
     }`;
 
-    if (routes.has(endpoint)) return this;
+    const routing = this.registry.get(endpoint);
 
-    routes.set(endpoint, {
+    if (!routing) {
+      this.registry.set(endpoint, {
+        parser: match<Record<string, string>>(endpoint),
+        methods: {
+          [resolvedMethod]: {
+            name: prepare.name,
+            handler: prepare(),
+          },
+        },
+      });
+
+      return this;
+    }
+
+    if (routing.methods[resolvedMethod]) return this;
+
+    routing.methods[resolvedMethod] = {
       name: prepare.name,
-      endpoint,
       handler: prepare(),
-      parser: match<Record<string, string>>(endpoint),
-    });
+    };
 
     return this;
   }
@@ -95,79 +113,72 @@ export class Router {
     this.registerMethod(path, prepare);
 
   public match(method: TMethod, endpoint: string) {
-    const mainRoutes = this.routesTree[method];
-    const otherRoutes = this.routesTree["all"];
+    for (const routing of this.registry.values()) {
+      const match = routing.parser(endpoint);
 
-    if (!mainRoutes && !otherRoutes) {
-      return (_req: Request) => new Response("Not found", { status: 404 });
-    }
+      if (!match) continue;
 
-    for (const routes of [mainRoutes, otherRoutes]) {
-      if (routes) {
-        for (const [, { name, handler, parser }] of routes) {
-          const match = parser(endpoint);
+      const handlerObj = routing.methods[method] || routing.methods["all"];
 
-          if (match) {
-            return async (req: Request, ...hooks: THook[]) => {
-              try {
-                for (const hook of hooks) {
-                  if (typeof hook.pre === "function") {
-                    const hookRes = await hook.pre(
-                      this.registerFn.name,
-                      name,
-                      req,
-                    );
+      if (handlerObj) {
+        return async (req: Request, ...hooks: THook[]) => {
+          try {
+            for (const hook of hooks) {
+              if (typeof hook.pre === "function") {
+                const hookRes = await hook.pre(
+                  this.registerFn.name,
+                  handlerObj.name,
+                  req,
+                );
 
-                    if (hookRes instanceof Response) return hookRes;
-                  }
-                }
-
-                paramsMap.set(req, match.params);
-
-                let res: Response;
-
-                if (typeof handler === "function") {
-                  res = await handler(req);
-                } else {
-                  res = await handler.handler(req);
-                }
-
-                for (const hook of hooks) {
-                  if (typeof hook.post === "function") {
-                    const hookRes = await hook.post(
-                      this.registerFn.name,
-                      name,
-                      req,
-                      res,
-                    );
-
-                    if (hookRes instanceof Response) return hookRes;
-                  }
-                }
-
-                return res;
-              } catch (error) {
-                if (error instanceof ZodError) {
-                  return Response.json({
-                    error: z.prettifyError(error),
-                  }, { status: 400 });
-                }
-
-                return Response.json({
-                  error: error instanceof Error
-                    ? {
-                      message: error.message,
-                      name: error.name,
-                      stack: Env.is(EnvType.DEVELOPMENT)
-                        ? error.stack
-                        : undefined,
-                    }
-                    : error,
-                }, { status: 500 });
+                if (hookRes instanceof Response) return hookRes;
               }
-            };
+            }
+
+            paramsMap.set(req, match.params);
+
+            const handler = handlerObj.handler;
+
+            let res: Response;
+
+            if (typeof handler === "function") {
+              res = await handler(req);
+            } else {
+              res = await handler.handler(req);
+            }
+
+            for (const hook of hooks) {
+              if (typeof hook.post === "function") {
+                const hookRes = await hook.post(
+                  this.registerFn.name,
+                  handlerObj.name,
+                  req,
+                  res,
+                );
+
+                if (hookRes instanceof Response) return hookRes;
+              }
+            }
+
+            return res;
+          } catch (error) {
+            if (error instanceof ZodError) {
+              return Response.json({
+                error: z.prettifyError(error),
+              }, { status: 400 });
+            }
+
+            return Response.json({
+              error: error instanceof Error
+                ? {
+                  message: error.message,
+                  name: error.name,
+                  stack: Env.is(EnvType.DEVELOPMENT) ? error.stack : undefined,
+                }
+                : error,
+            }, { status: 500 });
           }
-        }
+        };
       }
     }
   }
