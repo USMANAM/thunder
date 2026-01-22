@@ -1,6 +1,7 @@
 import { expandGlob } from "@std/fs";
 import { join } from "@std/path/join";
 import { toFileUrl } from "@std/path/to-file-url";
+import { hooksCache } from "./constants.ts";
 
 export type THook = {
   priority?: number;
@@ -17,13 +18,14 @@ export type THook = {
   ) => Response | void | Promise<Response | void>;
 };
 
-// Cache the loading promise, not the result - prevents race conditions
-let hooksPromise: Promise<THook[]> | undefined;
-
 export const loadHooks = (
   root: string,
   globPattern: string,
 ): Promise<THook[]> => {
+  const cacheKey = root + globPattern;
+
+  let hooksPromise = hooksCache.get(cacheKey);
+
   if (hooksPromise !== undefined) return hooksPromise;
 
   // Store the promise immediately so concurrent calls await the same promise
@@ -52,6 +54,8 @@ export const loadHooks = (
 
     return hooks;
   })();
+
+  hooksCache.set(cacheKey, hooksPromise);
 
   return hooksPromise;
 };
