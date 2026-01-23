@@ -1,4 +1,4 @@
-import { Router } from "@/core/http/router.ts";
+import { Router } from "@core/http/router.ts";
 
 export default new Router("/api/", function home({ get }) {
   get("/", function status() {

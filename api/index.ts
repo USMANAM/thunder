@@ -1,5 +1,5 @@
-import { Router } from "@/core/http/router.ts";
-import { paramsAsJson, serveAssets } from "@/core/http/utils.ts";
+import { Router } from "@core/http/router.ts";
+import { paramsAsJson, serveAssets } from "@core/http/utils.ts";
 import { fromFileUrl } from "@std/path/from-file-url";
 import z from "zod";
 
