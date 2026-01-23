@@ -28,12 +28,12 @@ export const discover = async (
 
   const router = module.default;
 
-  if (typeof router?.match === "function") {
+  if (typeof router?.route === "function") {
     const resolvedEndpoint = fallback
       ? `/${pathnameParts.join("/") ?? ""}`
       : `/${endpointParts.join("/") ?? ""}`;
 
-    const exec = router.match(
+    const exec = router.route(
       req.method.toLowerCase() as TMethod,
       resolvedEndpoint,
     );

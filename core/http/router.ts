@@ -112,7 +112,7 @@ export class Router {
   protected all: TRegisterMethod = (path, prepare) =>
     this.registerMethod(path, prepare);
 
-  public match(method: TMethod, endpoint: string) {
+  public route(method: TMethod, endpoint: string) {
     for (const routing of this.registry.values()) {
       const match = routing.parser(endpoint);
 
