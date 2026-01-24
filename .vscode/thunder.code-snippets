@@ -43,7 +43,7 @@
       "\tpost: async (scope, name, req, res) => {",
       "\t\t// Executes after the request is handled",
       "\t}",
-      "} satisfies THook"
+      "} satisfies THook;"
     ]
   }
 }
