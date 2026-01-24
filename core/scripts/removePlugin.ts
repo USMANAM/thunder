@@ -3,9 +3,34 @@ import { join } from "@std/path";
 import { z } from "zod";
 import { Input } from "@cliffy/prompt/input";
 
-import { sh } from "./lib/sh.ts";
 import { writeJSONFile } from "./lib/utility.ts";
-import { denoConfig, denoConfigPath } from "../common/denoConfig.ts";
+import { denoConfigPath, readDenoConfig } from "../common/denoConfig.ts";
+import { resolvePluginName } from "./addPlugin.ts";
+
+export const removePluginFromImportMap = async (
+  name: string,
+) => {
+  const targetConfig = await readDenoConfig(denoConfigPath, true);
+
+  if (!targetConfig.imports && !targetConfig.scopes) return;
+
+  delete targetConfig.imports?.[`@plugins/${name}/`];
+  delete targetConfig.scopes?.[`./plugins/${name}/`];
+
+  await writeJSONFile(denoConfigPath, targetConfig);
+};
+
+export const unlinkPlugin = async (name: string, opts?: { cwd?: string }) => {
+  const cwd = opts?.cwd ?? Deno.cwd();
+  const targetPath = join(cwd, "plugins", name);
+
+  await Deno.remove(targetPath, { recursive: true });
+
+  await removePluginFromImportMap(name);
+
+  await Deno.remove(join(cwd, "./api", name), { recursive: true });
+  await Deno.remove(join(cwd, "./hooks", name), { recursive: true });
+};
 
 export const removePlugin = async (options: {
   name: string;
@@ -23,51 +48,9 @@ export const removePlugin = async (options: {
 
   if (!Options.name) throw new Error("Plugin name is required");
 
-  const pluginPath = `plugins/${Options.name}`;
+  const resolvedPluginName = resolvePluginName(Options.name);
 
-  const deinit = [
-    "git",
-    "submodule",
-    "deinit",
-    "-f",
-    pluginPath,
-  ];
-
-  await sh(deinit, { cwd: Deno.cwd() });
-
-  const gitRm = [
-    "git",
-    "rm",
-    "-f",
-    pluginPath,
-  ];
-
-  await sh(gitRm, { cwd: Deno.cwd() });
-
-  await Promise.allSettled(
-    [
-      Deno.remove(`.git/modules/${pluginPath}`, { recursive: true }),
-      ...[
-        join(Deno.cwd(), "./api", Options.name),
-        join(Deno.cwd(), "./hooks", Options.name),
-      ].map((path) =>
-        Deno.remove(path, {
-          recursive: true,
-        })
-      ),
-      writeJSONFile(
-        denoConfigPath,
-        {
-          ...denoConfig,
-          workspace: denoConfig.workspace?.filter((i) =>
-            i !== `./plugins/${Options.name}`
-          ),
-        },
-      ),
-    ],
-  );
-
-  console.log("Success");
+  await unlinkPlugin(resolvedPluginName);
 };
 
 if (import.meta.main) {
@@ -77,6 +60,8 @@ if (import.meta.main) {
     name: name ?? n,
     prompt: true,
   });
+
+  console.log("Success");
 
   Deno.exit();
 }

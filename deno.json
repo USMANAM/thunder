@@ -7,6 +7,7 @@
     "init": "rm -rf .git && git init && git config core.hooksPath .githooks",
     "update:core": "deno run -A ./core/scripts/updateCore.ts",
     "add:plugin": "deno run -A ./core/scripts/addPlugin.ts",
+    "update:plugin": "deno run -A ./core/scripts/updatePlugin.ts",
     "remove:plugin": "deno run -A ./core/scripts/removePlugin.ts"
   },
   "imports": {
@@ -18,5 +19,6 @@
     "@std/fs": "jsr:@std/fs@^1.0.21",
     "@std/http": "jsr:@std/http@^1.0.23",
     "@std/path": "jsr:@std/path@^1.1.4"
-  }
+  },
+  "scopes": {}
 }

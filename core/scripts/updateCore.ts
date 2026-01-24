@@ -165,8 +165,6 @@ export const updateCore = async (options: {
 
     await mergeDenoConfig(TempPath);
   } else throw new Error("We were unable to update the core!");
-
-  console.info("Core has been updated successfully!");
 };
 
 if (import.meta.main) {
@@ -177,6 +175,8 @@ if (import.meta.main) {
     forceSync,
     prompt: true,
   });
+
+  console.info("Core has been updated successfully!");
 
   Deno.exit();
 }

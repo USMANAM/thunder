@@ -24,19 +24,17 @@ export const addPluginToImportMap = async (
 ) => {
   const cwd = opts?.cwd ?? Deno.cwd();
   const sourcePath = join(cwd, "_temp", name);
+  const sourceConfigPath = join(sourcePath, "deno.json");
 
-  const sourceConfig = await readDenoConfig(denoConfigPath, true);
-  const targetConfig = await readDenoConfig(
-    join(sourcePath, "deno.json"),
-    true,
-  );
+  const sourceConfig = await readDenoConfig(sourceConfigPath, true);
+  const targetConfig = await readDenoConfig(denoConfigPath, true);
 
-  if (!sourceConfig.imports) sourceConfig.imports = {};
-  if (!sourceConfig.scopes) sourceConfig.scopes = {};
+  if (!targetConfig.imports) targetConfig.imports = {};
+  if (!targetConfig.scopes) targetConfig.scopes = {};
 
-  sourceConfig.imports[`@plugins/${name}/`] = `./plugins/${name}/`;
-  sourceConfig.scopes[`./plugins/${name}/`] = Object.fromEntries(
-    Object.entries(targetConfig.imports || {}).map(([key, value]) => {
+  targetConfig.imports[`@plugins/${name}/`] = `./plugins/${name}/`;
+  targetConfig.scopes[`./plugins/${name}/`] = Object.fromEntries(
+    Object.entries(sourceConfig.imports || {}).map(([key, value]) => {
       if (key.startsWith("@core/")) return [key, value];
 
       let isUrl: boolean;
@@ -56,7 +54,7 @@ export const addPluginToImportMap = async (
     }),
   );
 
-  await writeJSONFile(denoConfigPath, sourceConfig);
+  await writeJSONFile(denoConfigPath, targetConfig);
 };
 
 export const linkPlugin = async (name: string, opts?: { cwd?: string }) => {
@@ -102,24 +100,24 @@ export const linkPlugin = async (name: string, opts?: { cwd?: string }) => {
     }
   }
 
+  await addPluginToImportMap(name);
+
   await symlink(
     join(targetPath, "./api"),
-    join(Deno.cwd(), "./api", name),
+    join(cwd, "./api", name),
   );
 
   await symlink(
     join(targetPath, "./hooks"),
-    join(Deno.cwd(), "./hooks", name),
+    join(cwd, "./hooks", name),
   );
-
-  await addPluginToImportMap(name);
 };
 
 export const addPlugin = async (options: {
   name: string;
   prompt?: boolean;
 }) => {
-  const Options = await z.object({
+  const Options = z.object({
     name: z.optional(z.string()),
   }).parse(options);
 
@@ -146,11 +144,17 @@ export const addPlugin = async (options: {
     ];
 
     await sh(command, { cwd: Deno.cwd() });
+  } else {
+    const command = [
+      "git",
+      "pull",
+      "--progress",
+    ];
+
+    await sh(command, { cwd: TempPath });
   }
 
   await linkPlugin(resolvedPluginName);
-
-  console.log("Success");
 };
 
 if (import.meta.main) {
@@ -160,6 +164,8 @@ if (import.meta.main) {
     name: name ?? n,
     prompt: true,
   });
+
+  console.log("Success");
 
   Deno.exit();
 }
