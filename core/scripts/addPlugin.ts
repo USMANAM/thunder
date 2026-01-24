@@ -33,26 +33,40 @@ export const addPluginToImportMap = async (
   if (!targetConfig.scopes) targetConfig.scopes = {};
 
   targetConfig.imports[`@plugins/${name}/`] = `./plugins/${name}/`;
-  targetConfig.scopes[`./plugins/${name}/`] = Object.fromEntries(
-    Object.entries(sourceConfig.imports || {}).map(([key, value]) => {
-      if (key.startsWith("@core/")) return [key, value];
+  targetConfig.scopes[`./plugins/${name}/`] = {
+    "@/": `./plugins/${name}/`,
+    "@/core/": "./core/",
+    "@/database.ts": "./database.ts",
+    ...Object.fromEntries(
+      Object.entries(sourceConfig.imports || {})
+        .filter(
+          ([key]) => {
+            if (key === "@plugins/") return false;
+            if (targetConfig.imports && key in targetConfig.imports) {
+              return false;
+            }
 
-      let isUrl: boolean;
+            return true;
+          },
+        )
+        .map(([key, value]) => {
+          let isUrl: boolean;
 
-      try {
-        new URL(value);
-        isUrl = true;
-      } catch {
-        isUrl = false;
-      }
+          try {
+            new URL(value);
+            isUrl = true;
+          } catch {
+            isUrl = false;
+          }
 
-      const resolvedValue = !isUrl && !isAbsolute(value)
-        ? `./${join(`./plugins/${name}/`, value).replace(/\\/g, "/")}`
-        : value;
+          const resolvedValue = !isUrl && !isAbsolute(value)
+            ? `./${join(`./plugins/${name}/`, value).replace(/\\/g, "/")}`
+            : value;
 
-      return [key, resolvedValue];
-    }),
-  );
+          return [key, resolvedValue];
+        }),
+    ),
+  };
 
   await writeJSONFile(denoConfigPath, targetConfig);
 };

@@ -10,9 +10,7 @@
     "remove:plugin": "deno run -A ./core/scripts/removePlugin.ts"
   },
   "imports": {
-    "@core/": "./core/",
-    "@db/": "./db/",
-    "@lib/": "./lib/",
+    "@/": "./",
     "@cliffy/prompt": "jsr:@cliffy/prompt@^1.0.0-rc.8",
     "@neondatabase/serverless": "npm:@neondatabase/serverless@^1.0.2",
     "@std/cli": "jsr:@std/cli@^1.0.25",
