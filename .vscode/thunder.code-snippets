@@ -27,5 +27,23 @@
       "\t}",
       "});"
     ]
+  },
+  "create-hook": {
+    "scope": "typescript",
+    "description": "Generates a thunder hook",
+    "prefix": ["hook"],
+    "body": [
+      "import { THook } from \"@core/http/hooks.ts\";",
+      "",
+      "export default {",
+      "\tpriority: ${1:0},",
+      "\tpre: async (scope, name, req) => {",
+      "\t\t// Executes before the request is handled",
+      "\t},",
+      "\tpost: async (scope, name, req, res) => {",
+      "\t\t// Executes after the request is handled",
+      "\t}",
+      "} satisfies THook"
+    ]
   }
 }

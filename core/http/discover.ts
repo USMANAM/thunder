@@ -1,4 +1,3 @@
-import { Logger } from "../common/logger.ts";
 import { loadHooks } from "./hooks.ts";
 import { loadRoutes } from "./routes.ts";
 import { TMethod, TRouteExecutor } from "./router.ts";
@@ -38,32 +37,13 @@ export const discover = async (
       resolvedEndpoint,
     );
 
-    return async (req: Request) => {
-      const res = typeof exec === "function"
+    return async (req: Request) =>
+      typeof exec === "function"
         ? await exec(
           req,
           ...(await loadHooks(hooksPath, "./**/*.ts")),
         )
         : new Response("Not found", { status: 404 });
-
-      const log = (() => {
-        switch (true) {
-          case res.status < 300:
-            return Logger.success;
-          case res.status < 400:
-            return Logger.info;
-          case res.status < 500:
-            return Logger.warn;
-
-          default:
-            return Logger.error;
-        }
-      })();
-
-      log.bind(Logger)(req.method.toUpperCase(), req.url, res.status);
-
-      return res;
-    };
   }
 
   throw new Error(`Not a valid router at ${url.pathname}`);
