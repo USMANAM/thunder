@@ -28,7 +28,11 @@ export type TRegisterMethod = (
   prepare: TPrepareHandler,
 ) => Router;
 
+export type TRegisterFn = (method: Record<TMethod, TRegisterMethod>) => void;
+
 export class Router {
+  protected name: string;
+  protected parser?: MatchFunction<Record<string, string>>;
   protected registry: Map<
     string,
     {
@@ -43,19 +47,47 @@ export class Router {
   > = new Map();
 
   constructor(
-    protected root: string,
-    protected registerFn: (method: Record<TMethod, TRegisterMethod>) => void,
+    registerFn: TRegisterFn,
+  );
+  constructor(
+    root: string,
+    registerFn: TRegisterFn,
+  );
+  constructor(
+    root: string | TRegisterFn,
+    registerFn?: TRegisterFn,
   ) {
-    if (!registerFn.name) {
+    let rootPath: string | undefined;
+    let fn: TRegisterFn;
+
+    if (typeof root === "function") {
+      fn = root;
+    } else {
+      rootPath = root;
+
+      if (!registerFn) {
+        throw new Error("Register function must be provided!");
+      }
+
+      fn = registerFn;
+    }
+
+    if (!fn.name) {
       throw new Error("A named function should be passed to router!");
     }
 
+    this.name = fn.name;
+
+    if (rootPath) {
+      this.parser = match(`/${rootPath.replace(/^\/|\/$/g, "")}{/*__endpoint}`);
+    }
+
     // deno-lint-ignore no-explicit-any
-    registerFn(this as any);
+    fn(this as any);
   }
 
   protected registerMethod(
-    path: string,
+    endpoint: string,
     prepare: TPrepareHandler,
     method?: TMethod,
   ) {
@@ -64,15 +96,12 @@ export class Router {
     }
 
     const resolvedMethod = method || "all";
-    const endpoint = `/${
-      (this.root + path).split("/").filter(Boolean).join("/")
-    }`;
 
     const routing = this.registry.get(endpoint);
 
     if (!routing) {
       this.registry.set(endpoint, {
-        parser: match<Record<string, string>>(endpoint),
+        parser: match(endpoint),
         methods: {
           [resolvedMethod]: {
             name: prepare.name,
@@ -113,8 +142,21 @@ export class Router {
     this.registerMethod(path, prepare);
 
   public route(method: TMethod, endpoint: string) {
+    let targetEndpoint = endpoint;
+
+    if (this.parser) {
+      const match = this.parser(endpoint);
+
+      if (!match) return;
+
+      targetEndpoint =
+        (match.params.__endpoint as unknown as Array<string> | undefined)?.join(
+          "/",
+        ) ?? "/";
+    }
+
     for (const routing of this.registry.values()) {
-      const match = routing.parser(endpoint);
+      const match = routing.parser(targetEndpoint);
 
       if (!match) continue;
 
@@ -126,7 +168,7 @@ export class Router {
             for (const hook of hooks) {
               if (typeof hook.pre === "function") {
                 const hookRes = await hook.pre(
-                  this.registerFn.name,
+                  this.name,
                   handlerObj.name,
                   req,
                 );
@@ -150,7 +192,7 @@ export class Router {
             for (const hook of hooks) {
               if (typeof hook.post === "function") {
                 const hookRes = await hook.post(
-                  this.registerFn.name,
+                  this.name,
                   handlerObj.name,
                   req,
                   res,
