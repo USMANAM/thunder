@@ -9,10 +9,10 @@ export type THandler = (req: Request) => TResponse;
 export type TNextFunction = () => TResponse;
 export type TMiddleware = (req: Request, next: TNextFunction) => TResponse;
 export type THandlerIOShapes = () => {
-  params: z.ZodType;
-  query: z.ZodType;
-  body: z.ZodType;
-  return: z.ZodType;
+  params?: z.ZodType;
+  query?: z.ZodType;
+  body?: z.ZodType;
+  return?: z.ZodType;
 };
 export type THandlerOpts = {
   shape?: THandlerIOShapes;
