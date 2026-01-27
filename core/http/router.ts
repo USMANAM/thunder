@@ -79,7 +79,7 @@ export class Router {
     this.name = fn.name;
 
     if (rootPath) {
-      this.parser = match(`/${rootPath.replace(/^\/|\/$/g, "")}{/*__endpoint}`);
+      this.parser = match(`/${rootPath.replace(/^\/|\/$/g, "")}{*__endpoint}`);
     }
 
     // deno-lint-ignore no-explicit-any
