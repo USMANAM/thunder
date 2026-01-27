@@ -1,3 +1,6 @@
+import { parse } from "@std/dotenv";
+import { join } from "path";
+
 export enum EnvType {
   DEVELOPMENT = "development",
   STAGING = "staging",
@@ -6,6 +9,8 @@ export enum EnvType {
 }
 
 export class Env {
+  private static configuration?: Record<string, string>;
+
   static onGetFailed?: (
     key: string,
   ) => Promise<string | null | undefined> | string | null | undefined;
@@ -35,7 +40,31 @@ export class Env {
    * @returns
    */
   static getAll<T extends Record<string, string>>(): T {
-    return Deno.env.toObject() as T;
+    if (Env.configuration) return Env.configuration as T;
+
+    let GlobalEnv: Record<string, string>;
+
+    try {
+      GlobalEnv = parse(Deno.readTextFileSync(join(Deno.cwd(), `./.env`)));
+    } catch {
+      GlobalEnv = {};
+    }
+
+    let ScopedEnv: Record<string, string>;
+
+    try {
+      ScopedEnv = parse(
+        Deno.readTextFileSync(join(Deno.cwd(), `./.env.${Env.getType()}`)),
+      );
+    } catch {
+      ScopedEnv = {};
+    }
+
+    return (Env.configuration = {
+      ...Deno.env.toObject(),
+      ...GlobalEnv,
+      ...ScopedEnv,
+    }) as T;
   }
 
   /**
