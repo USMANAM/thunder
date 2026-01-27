@@ -149,10 +149,11 @@ export class Router {
 
       if (!match) return;
 
-      targetEndpoint =
-        (match.params.__endpoint as unknown as Array<string> | undefined)?.join(
-          "/",
-        ) ?? "/";
+      targetEndpoint = "/" +
+        ((match.params.__endpoint as unknown as Array<string> | undefined)
+          ?.join(
+            "/",
+          ) ?? "");
     }
 
     for (const routing of this.registry.values()) {
