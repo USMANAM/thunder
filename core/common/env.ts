@@ -1,5 +1,5 @@
 import { parse } from "@std/dotenv";
-import { join } from "path";
+import { join } from "@std/path/join";
 
 export enum EnvType {
   DEVELOPMENT = "development",
