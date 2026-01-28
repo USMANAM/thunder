@@ -81,11 +81,11 @@ export const linkPlugin = async (name: string, opts?: { cwd?: string }) => {
   }
 
   // Copy plugin source to plugins directory
-  // We will only copy the following files/folders: api, hooks, deno.json, README.md
+  // We will only copy the following files/folders: apis, hooks, deno.json, README.md
   await Deno.mkdir(targetPath, { recursive: true });
 
   const globPatterns = [
-    "{api,db,hooks,lib,public}/**/*",
+    "{apis,schemas,hooks,lib,public}/**/*",
   ];
 
   for (const pattern of globPatterns) {
@@ -117,8 +117,8 @@ export const linkPlugin = async (name: string, opts?: { cwd?: string }) => {
   await addPluginToImportMap(name);
 
   await symlink(
-    join(targetPath, "./api"),
-    join(cwd, "./api", name),
+    join(targetPath, "./apis"),
+    join(cwd, "./apis", name),
   );
 
   await symlink(

@@ -28,7 +28,7 @@ export const unlinkPlugin = async (name: string, opts?: { cwd?: string }) => {
 
   await removePluginFromImportMap(name);
 
-  await Deno.remove(join(cwd, "./api", name), { recursive: true });
+  await Deno.remove(join(cwd, "./apis", name), { recursive: true });
   await Deno.remove(join(cwd, "./hooks", name), { recursive: true });
 };
 
