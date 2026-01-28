@@ -5,13 +5,13 @@ import { TMethod, TRouteExecutor } from "./router.ts";
 export const discover = async (
   req: Request,
   opts?: {
-    apis?: string;
+    routes?: string;
     hooks?: string;
   },
 ): Promise<TRouteExecutor> => {
   const url = new URL(req.url);
 
-  const apisPath = opts?.apis ?? "apis";
+  const routesPath = opts?.routes ?? "routes";
   const hooksPath = opts?.hooks ?? "hooks";
 
   const pathnameParts = url.pathname.split("/").filter(
@@ -20,7 +20,7 @@ export const discover = async (
   const [namespace, ...endpointParts] = pathnameParts;
 
   const { fallback, module } = await loadRoutes(
-    apisPath,
+    routesPath,
     `./**/*.ts`,
     namespace + ".ts",
   );
