@@ -3,6 +3,7 @@
     "deinit",
     "Huruf",
     "neondatabase",
+    "surrealdb",
     "treeify"
   ],
   "deno.enable": true
