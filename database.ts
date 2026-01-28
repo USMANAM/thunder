@@ -12,7 +12,7 @@ const username = connectionURL.username;
 const password = connectionURL.password;
 
 await db.connect(
-  connectionString,
+  connectionURL.origin + connectionURL.pathname,
   {
     namespace,
     database,
