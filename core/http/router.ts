@@ -2,7 +2,7 @@ import z, { ZodError } from "zod";
 import { match, MatchFunction } from "path-to-regexp";
 import { THook } from "./hooks.ts";
 import { paramsMap } from "./constants.ts";
-import { Env, EnvType } from "../common/env.ts";
+import { Env, EnvType } from "../utils/env.ts";
 
 export type TResponse = Response | Promise<Response>;
 export type THandler = (req: Request) => TResponse;

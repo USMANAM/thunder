@@ -1,26 +1,7 @@
-import { Env } from "./core/common/env.ts";
-import { Surreal } from "surrealdb";
+import { Env } from "@/core/utils/env.ts";
+import { MongoClient } from "mongodb";
 
-export const db = new Surreal();
-
-const connectionString = Env.getSync("DATABASE_URL");
-const connectionURL = new URL(connectionString);
-
-const namespace = connectionURL.searchParams.get("namespace") ?? undefined;
-const database = connectionURL.searchParams.get("database") ?? undefined;
-const username = connectionURL.username;
-const password = connectionURL.password;
-
-await db.connect(
-  connectionURL.origin + connectionURL.pathname,
-  {
-    namespace,
-    database,
-    auth: {
-      namespace,
-      database,
-      username,
-      password,
-    },
-  },
-);
+export const mongodb = new MongoClient(Env.getSync("DATABASE_URL"), {
+  maxPoolSize: 30,
+  waitQueueTimeoutMS: 10000,
+});
