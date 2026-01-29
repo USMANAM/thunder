@@ -151,9 +151,7 @@ export class Router {
 
       targetEndpoint = "/" +
         ((match.params.__endpoint as unknown as Array<string> | undefined)
-          ?.join(
-            "/",
-          ) ?? "");
+          ?.filter(Boolean).join("/") ?? "");
     }
 
     for (const routing of this.registry.values()) {
@@ -165,30 +163,54 @@ export class Router {
 
       if (handlerObj) {
         return async (req: Request, ...hooks: THook[]) => {
-          try {
-            for (const hook of hooks) {
-              if (typeof hook.pre === "function") {
-                const hookRes = await hook.pre(
-                  this.name,
-                  handlerObj.name,
-                  req,
-                );
-
-                if (hookRes instanceof Response) return hookRes;
+          const tryHandle = (callback: () => Promise<Response>) => {
+            try {
+              return callback();
+            } catch (error) {
+              if (error instanceof ZodError) {
+                return Response.json({
+                  error: z.prettifyError(error),
+                }, { status: 400 });
               }
+
+              return Response.json({
+                error: error instanceof Error
+                  ? {
+                    message: error.message,
+                    name: error.name,
+                    stack: Env.is(EnvType.DEVELOPMENT)
+                      ? error.stack
+                      : undefined,
+                  }
+                  : error,
+              }, { status: 500 });
             }
+          };
 
-            paramsMap.set(req, match.params);
+          return await tryHandle(async () => {
+            const res = await tryHandle(async () => {
+              for (const hook of hooks) {
+                if (typeof hook.pre === "function") {
+                  const hookRes = await hook.pre(
+                    this.name,
+                    handlerObj.name,
+                    req,
+                  );
 
-            const handler = handlerObj.handler;
+                  if (hookRes instanceof Response) return hookRes;
+                }
+              }
 
-            let res: Response;
+              paramsMap.set(req, match.params);
 
-            if (typeof handler === "function") {
-              res = await handler(req);
-            } else {
-              res = await handler.handler(req);
-            }
+              const handler = handlerObj.handler;
+
+              if (typeof handler === "function") {
+                return await handler(req);
+              } else {
+                return await handler.handler(req);
+              }
+            });
 
             for (const hook of hooks) {
               if (typeof hook.post === "function") {
@@ -204,23 +226,7 @@ export class Router {
             }
 
             return res;
-          } catch (error) {
-            if (error instanceof ZodError) {
-              return Response.json({
-                error: z.prettifyError(error),
-              }, { status: 400 });
-            }
-
-            return Response.json({
-              error: error instanceof Error
-                ? {
-                  message: error.message,
-                  name: error.name,
-                  stack: Env.is(EnvType.DEVELOPMENT) ? error.stack : undefined,
-                }
-                : error,
-            }, { status: 500 });
-          }
+          });
         };
       }
     }
