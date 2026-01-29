@@ -163,9 +163,9 @@ export class Router {
 
       if (handlerObj) {
         return async (req: Request, ...hooks: THook[]) => {
-          const tryHandle = (callback: () => Promise<Response>) => {
+          const tryHandle = async (callback: () => Promise<Response>) => {
             try {
-              return callback();
+              return await callback();
             } catch (error) {
               if (error instanceof ZodError) {
                 return Response.json({
