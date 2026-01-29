@@ -1,5 +1,5 @@
 import { exists } from "@std/fs/exists";
-import { parseQueryParams } from "../common/parseQueryParams.ts";
+import { parseQueryParams } from "../utils/parseQueryParams.ts";
 import { join } from "@std/path/join";
 import { serveFile } from "@std/http/file-server";
 import { indexFileCache, paramsMap } from "./constants.ts";

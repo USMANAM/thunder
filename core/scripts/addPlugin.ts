@@ -7,7 +7,7 @@ import { Input } from "@cliffy/prompt/input";
 
 import { sh } from "./lib/sh.ts";
 import { symlink, writeJSONFile } from "./lib/utility.ts";
-import { denoConfigPath, readDenoConfig } from "../common/denoConfig.ts";
+import { denoConfigPath, readDenoConfig } from "../utils/denoConfig.ts";
 
 export const resolvePluginName = (name: string) =>
   name

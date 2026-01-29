@@ -4,7 +4,7 @@ import { z } from "zod";
 import { Input } from "@cliffy/prompt/input";
 
 import { writeJSONFile } from "./lib/utility.ts";
-import { denoConfigPath, readDenoConfig } from "../common/denoConfig.ts";
+import { denoConfigPath, readDenoConfig } from "../utils/denoConfig.ts";
 import { resolvePluginName } from "./addPlugin.ts";
 
 export const removePluginFromImportMap = async (
