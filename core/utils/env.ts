@@ -23,7 +23,7 @@ export class Env {
 
     return Target && Object.values(EnvType).includes(Target)
       ? Target
-      : EnvType.DEVELOPMENT;
+      : EnvType.PRODUCTION;
   }
 
   /**
