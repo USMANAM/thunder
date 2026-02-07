@@ -1,4 +1,28 @@
 {
+  "create-crud-router": {
+    "scope": "typescript",
+    "description": "Generates a thunder router crud",
+    "prefix": "crud",
+    "body": [
+      "import { Router } from \"@/core/http/router.ts\";",
+      "import { createCRUD } from \"@/core/utils/createCRUD.ts\";",
+      "import { $1InputSchema, $1Model, $1Schema } from \"@/schemas/organization.ts\";",
+      "import { ObjectId } from \"mongodb\";",
+      "",
+      "export default new Router(\"/\", function $1s(router) {",
+      "\tcreateCRUD({",
+      "\t\trouter,",
+      "\t\tschema: $1Schema,",
+      "\t\tinsertSchema: $1InputSchema,",
+      "\t\tmodel: $1Model,",
+      "\t}, {",
+      "\t\tisolationFields: async (req) => {",
+      "\t\t// Remove this function or return isolation fields",
+      "\t\t},",
+      "\t});",
+      "});"
+    ],
+  },
   "create-router": {
     "scope": "typescript",
     "description": "Generates a thunder router",
