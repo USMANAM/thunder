@@ -35,7 +35,7 @@
       "\t\t\tconst query = \\$query.parse(queryAsJson(req));",
       "\t\t\tconst body = \\$body.parse(bodyAsJson(req));",
       "\t\t\t$3\n",
-      "\t\t\treturn Response.json({});",
+      "\t\t\treturn Response.json({} satisfies z.output<typeof \\$return>);",
       "\t\t}",
       "\t}",
       "});",

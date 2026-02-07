@@ -173,6 +173,10 @@ export class Router {
                 }, { status: 400 });
               }
 
+              if (error instanceof Response) {
+                return error;
+              }
+
               return Response.json({
                 error: error instanceof Error
                   ? {
