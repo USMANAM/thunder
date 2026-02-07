@@ -1,4 +1,17 @@
 {
+  "create-router": {
+    "scope": "typescript",
+    "description": "Generates a thunder router",
+    "prefix": ["router"],
+    "body": [
+      "import { Router } from \"@/core/http/router.ts\";",
+      "import { Env } from \"@/core/utils/env.ts\";",
+      "",
+      "export default new Router(\"/\", function $1({ get }) {",
+      "\t${2:// type `req` and press Enter}",
+      "});",
+    ],
+  },
   "create-request": {
     "scope": "typescript",
     "description": "Generates a thunder request",
@@ -25,8 +38,8 @@
       "\t\t\treturn Response.json({});",
       "\t\t}",
       "\t}",
-      "});"
-    ]
+      "});",
+    ],
   },
   "create-hook": {
     "scope": "typescript",
@@ -43,7 +56,33 @@
       "\tpost: async (scope, name, req, res) => {",
       "\t\t// Executes after the request is handled",
       "\t}",
-      "} satisfies THook;"
-    ]
-  }
+      "} satisfies THook;",
+    ],
+  },
+  "create-model": {
+    "scope": "typescript",
+    "description": "Generate a thunder model",
+    "prefix": ["model"],
+    "body": [
+      "import z from \"zod\";",
+      "import { mongodb } from \"@/database.ts\";",
+
+      "export const $1InputSchema = z.object({",
+      "\t// Add your input fields here",
+      "});",
+
+      "export const $1Schema = z.intersection(",
+      "\t$1InputSchema,",
+      "\tz.object({",
+      "\t\tisBlocked: z.boolean().optional().default(false),",
+      "\t\tcreatedAt: z.date().optional().default(() => new Date()),",
+      "\t\tupdatedAt: z.date().optional().default(() => new Date()),",
+      "\t}),",
+      ");",
+
+      "export const $1Model = mongodb.db().collection<",
+      "\tz.infer<typeof $1Schema>",
+      ">(\"$1s\");",
+    ],
+  },
 }
