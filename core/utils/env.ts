@@ -1,5 +1,6 @@
 import { parse } from "@std/dotenv";
 import { join } from "@std/path/join";
+import { parseQueryParams } from "./parseQueryParams.ts";
 
 export enum EnvType {
   DEVELOPMENT = "development",
@@ -147,6 +148,45 @@ export class Env {
   }
 
   /**
+   * Asynchronously get a specific environment variable and cast to a set of string
+   * @param key Key of the variable
+   * @param silent By passing `false` this function will throw an error instead of returning an `empty set` if not found.
+   * @returns
+   */
+  static async listAsSet<T extends string>(
+    key: string,
+    silent = true,
+  ): Promise<Set<T>> {
+    return new Set<T>(await this.list<T[]>(key, silent));
+  }
+
+  /**
+   * Asynchronously get a specific environment variable and cast to an object
+   * @param key Key of the variable
+   * @param silent By passing `false` this function will throw an error instead of returning an `empty object` if not found.
+   * @returns
+   */
+  static async params<T extends Record<string, unknown>>(
+    key: string,
+    silent = true,
+  ) {
+    return parseQueryParams(await this.get(key, silent as true) ?? "") as T;
+  }
+
+  /**
+   * Asynchronously get a specific environment variable and cast to an object
+   * @param key Key of the variable
+   * @param silent By passing `false` this function will throw an error instead of returning an `empty object` if not found.
+   * @returns
+   */
+  static async json<T extends Record<string, unknown>>(
+    key: string,
+    silent = true,
+  ) {
+    return JSON.parse(await this.get(key, silent as true) ?? "") as T;
+  }
+
+  /**
    * Synchronously get a specific environment variable
    *
    * It is recommended to use get method instead of getSync because it makes a backup call (to a database or some other configured source) to ensure the availability of the environment variable.
@@ -203,5 +243,41 @@ export class Env {
    */
   static listSync<T extends string[]>(key: string, silent = true): T {
     return (this.getSync(key, silent as true)?.split(/\s*,\s*/) ?? []) as T;
+  }
+
+  /**
+   * Synchronously get a specific environment variable and cast to a set of string
+   * @param key Key of the variable
+   * @param silent By passing `false` this function will throw an error instead of returning an `empty set` if not found.
+   * @returns
+   */
+  static listAsSetSync<T extends string>(key: string, silent = true): Set<T> {
+    return new Set<T>(this.listSync<T[]>(key, silent));
+  }
+
+  /**
+   * Synchronously get a specific environment variable and cast to an object
+   * @param key Key of the variable
+   * @param silent By passing `false` this function will throw an error instead of returning an `empty object` if not found.
+   * @returns
+   */
+  static paramsSync<T extends Record<string, unknown>>(
+    key: string,
+    silent = true,
+  ) {
+    return parseQueryParams(this.getSync(key, silent as true) ?? "") as T;
+  }
+
+  /**
+   * Synchronously get a specific environment variable and cast to an object
+   * @param key Key of the variable
+   * @param silent By passing `false` this function will throw an error instead of returning an `empty object` if not found.
+   * @returns
+   */
+  static jsonSync<T extends Record<string, unknown>>(
+    key: string,
+    silent = true,
+  ) {
+    return JSON.parse(this.getSync(key, silent as true) ?? "") as T;
   }
 }
