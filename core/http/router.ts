@@ -28,8 +28,13 @@ export type TRegisterMethod = (
   prepare: TPrepareHandler,
 ) => Router;
 
+export type TRouter = Record<
+  Exclude<TMethod, "delete"> | "del",
+  TRegisterMethod
+>;
+
 export type TRegisterFn = (
-  method: Record<Exclude<TMethod, "delete"> | "del", TRegisterMethod>,
+  router: TRouter,
 ) => void;
 
 export class Router {
