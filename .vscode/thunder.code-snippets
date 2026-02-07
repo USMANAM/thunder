@@ -5,9 +5,8 @@
     "prefix": ["router"],
     "body": [
       "import { Router } from \"@/core/http/router.ts\";",
-      "import { Env } from \"@/core/utils/env.ts\";",
       "",
-      "export default new Router(\"/\", function $1({ get }) {",
+      "export default new Router(\"/\", function $1(router) {",
       "\t${2:// type `req` and press Enter}",
       "});",
     ],
@@ -17,7 +16,7 @@
     "description": "Generates a thunder request",
     "prefix": ["req"],
     "body": [
-      "${1|get,post,put,patch,delete|}(\"/\", function ${2:create}() {",
+      "router.${1|get,post,put,patch,del|}(\"/\", function ${2:create}() {",
       "\tconst \\$params = z.object({});",
       "\tconst \\$query = z.object({});",
       "\tconst \\$body = z.object({});",

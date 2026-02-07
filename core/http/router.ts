@@ -28,7 +28,9 @@ export type TRegisterMethod = (
   prepare: TPrepareHandler,
 ) => Router;
 
-export type TRegisterFn = (method: Record<TMethod, TRegisterMethod>) => void;
+export type TRegisterFn = (
+  method: Record<Exclude<TMethod, "delete"> | "del", TRegisterMethod>,
+) => void;
 
 export class Router {
   protected name: string;
@@ -135,7 +137,7 @@ export class Router {
   protected put: TRegisterMethod = (path, prepare) =>
     this.registerMethod(path, prepare, "put");
 
-  protected delete: TRegisterMethod = (path, prepare) =>
+  protected del: TRegisterMethod = (path, prepare) =>
     this.registerMethod(path, prepare, "delete");
 
   protected all: TRegisterMethod = (path, prepare) =>
