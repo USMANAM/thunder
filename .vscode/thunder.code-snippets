@@ -6,7 +6,7 @@
     "body": [
       "import { Router } from \"@/core/http/router.ts\";",
       "import { createCRUD } from \"@/core/utils/createCRUD.ts\";",
-      "import { $1InputSchema, $1Model, $1Schema } from \"@/schemas/organization.ts\";",
+      "import { $1InputSchema, $1Model, $1Schema } from \"@/schemas/$1.ts\";",
       "import { ObjectId } from \"mongodb\";",
       "",
       "export default new Router(\"/\", function $1s(router) {",
