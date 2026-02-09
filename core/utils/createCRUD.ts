@@ -14,6 +14,12 @@ export type TCrudDetails<T extends z.ZodObject> = {
 };
 
 export type TCrudOptions<T extends z.ZodObject> = {
+  disable?: {
+    create?: boolean;
+    get?: boolean;
+    update?: boolean;
+    del?: boolean;
+  };
   isolationFields?: (req: Request) => {
     [K in keyof z.infer<T>]?: unknown;
   };
@@ -23,121 +29,126 @@ export const createCRUD = <T extends z.ZodObject>(
   details: TCrudDetails<T>,
   opts?: TCrudOptions<T>,
 ) => {
-  const schemaWithObjectId = z.intersection(
-    z.object({ _id: z.instanceof(ObjectId) }),
-    details.schema,
-  );
+  if (!opts?.disable?.create) {
+    details.router.post("/", function create() {
+      const $body = details.insertSchema ?? details.schema;
+      const $return = z.object({
+        _id: z.instanceof(ObjectId),
+      });
 
-  details.router.post("/", function create() {
-    const $body = details.insertSchema ?? details.schema;
-    const $return = z.object({
-      _id: z.instanceof(ObjectId),
+      return {
+        shape: () => ({
+          body: $body,
+          return: $return,
+        }),
+        handler: async (req: Request) => {
+          const body = $body.parse(await bodyAsJson(req));
+
+          const { insertedId } = await details.model.insertOne(
+            details.schema.parse({
+              ...body,
+              ...opts?.isolationFields?.(req),
+            }) as any,
+          );
+
+          return Response.json({
+            _id: insertedId.toString(),
+          });
+        },
+      };
     });
+  }
 
-    return {
-      shape: () => ({
-        body: $body,
-        return: $return,
-      }),
-      handler: async (req: Request) => {
-        const body = $body.parse(bodyAsJson(req));
+  if (!opts?.disable?.get) {
+    details.router.get("{/:id}", function get() {
+      const $params = z.object({
+        id: z.string().optional(),
+      });
+      const $return = z.object({
+        results: z.array(details.schema.extend({
+          _id: z.instanceof(ObjectId),
+        })),
+      });
 
-        const { insertedId } = await details.model.insertOne(
-          details.schema.parse({
-            ...body,
-            ...opts?.isolationFields?.(req),
-          }) as any,
-        );
+      return {
+        shape: () => ({
+          params: $params,
+          return: $return,
+        }),
+        handler: async (req: Request) => {
+          const params = $params.parse(paramsAsJson(req));
 
-        return Response.json({
-          _id: insertedId.toString(),
-        });
-      },
-    };
-  });
+          const resultsQuery = details.model.find(
+            {
+              ...(params.id ? { _id: new ObjectId(params.id) } : {}),
+              ...opts?.isolationFields?.(req),
+            } as any,
+          );
 
-  details.router.get("{/:id}", function get() {
-    const $params = z.object({
-      id: z.string().optional(),
+          return Response.json(
+            {
+              results: await resultsQuery.toArray(),
+            },
+          );
+        },
+      };
     });
-    const $return = z.object({
-      results: z.array(schemaWithObjectId),
-    });
-
-    return {
-      shape: () => ({
-        params: $params,
-        return: $return,
-      }),
-      handler: async (req: Request) => {
-        const params = $params.parse(paramsAsJson(req));
-
-        const resultsQuery = details.model.find(
-          {
-            ...(params.id ? { _id: new ObjectId(params.id) } : {}),
-            ...opts?.isolationFields?.(req),
-          } as any,
-        );
-
-        return Response.json(
-          {
-            results: await resultsQuery.toArray(),
-          },
-        );
-      },
-    };
-  });
+  }
 
   const $params = z.object({
     id: z.string(),
   });
 
-  details.router.patch("/:id", function update() {
-    const $body =
-      (details.updateSchema ?? details.insertSchema ?? details.schema)
-        .partial();
+  if (opts?.disable?.update) {
+    details.router.patch("/:id", function update() {
+      const $body =
+        (details.updateSchema ?? details.insertSchema ?? details.schema)
+          .partial();
 
-    return {
-      shape: () => ({
-        params: $params,
-        body: $body,
-      }),
-      handler: async (req: Request) => {
-        const params = $params.parse(paramsAsJson(req));
-        const body = $body.parse(bodyAsJson(req));
+      return {
+        shape: () => ({
+          params: $params,
+          body: $body,
+        }),
+        handler: async (req: Request) => {
+          const params = $params.parse(paramsAsJson(req));
+          const body = $body.parse(await bodyAsJson(req));
 
-        const { modifiedCount } = await details.model.updateOne(
-          {
+          const { modifiedCount } = await details.model.updateOne(
+            {
+              _id: new ObjectId(params.id),
+              ...opts?.isolationFields?.(req),
+            } as any,
+            body,
+          );
+
+          if (!modifiedCount) throw new Error("No record updated!");
+
+          return Response.ok();
+        },
+      };
+    });
+  }
+
+  if (opts?.disable?.del) {
+    details.router.del("/:id", function del() {
+      return {
+        shape: () => ({
+          params: $params,
+        }),
+        handler: async (req: Request) => {
+          const params = $params.parse(paramsAsJson(req));
+
+          const { deletedCount } = await details.model.deleteOne({
             _id: new ObjectId(params.id),
             ...opts?.isolationFields?.(req),
-          } as any,
-          body,
-        );
+          } as any);
 
-        if (!modifiedCount) throw new Error("No record updated!");
+          if (!deletedCount) throw new Error("No record deleted!");
 
-        return Response.ok();
-      },
-    };
-  });
-
-  details.router.del("/", function create() {
-    return {
-      shape: () => ({
-        params: $params,
-      }),
-      handler: async (req: Request) => {
-        const params = $params.parse(paramsAsJson(req));
-
-        const { deletedCount } = await details.model.deleteOne({
-          _id: new ObjectId(params.id),
-          ...opts?.isolationFields?.(req),
-        } as any);
-
-        if (!deletedCount) throw new Error("No record deleted!");
-
-        return Response.ok();
-      },
-    };
-  });
+          return Response.ok();
+        },
+      };
+    });
+  }
 };
