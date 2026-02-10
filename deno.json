@@ -1,4 +1,7 @@
 {
+  "lint": {
+    "plugins": ["./core/lint-plugins/no-relative-core-imports.ts"]
+  },
   "tasks": {
     "check": "deno fmt && deno lint",
     "dev": "ENV_TYPE=development deno serve -A --watch serve.ts",
