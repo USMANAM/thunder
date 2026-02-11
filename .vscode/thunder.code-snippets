@@ -88,6 +88,7 @@
     "prefix": ["model"],
     "body": [
       "import z from \"zod\";",
+      "import { ObjectId } from \"mongodb\";",
       "import { mongodb } from \"@/database.ts\";",
       "",
       "export const $1InputSchema = z.object({",
@@ -95,7 +96,7 @@
       "});",
       "",
       "export const $1Schema = $1InputSchema.extend(z.object({",
-      "\tisBlocked: z.boolean().optional().default(false),",
+      "\tcreatedBy: z.instanceof(ObjectId),",
       "\tcreatedAt: z.date().optional().default(() => new Date()),",
       "\tupdatedAt: z.date().optional().default(() => new Date()),",
       "}));",
