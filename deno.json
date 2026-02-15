@@ -1,6 +1,9 @@
 {
   "lint": {
-    "plugins": ["./core/lint-plugins/no-relative-core-imports.ts"]
+    "plugins": [
+      "./core/lint-plugins/no-relative-core-imports.ts",
+      "./core/lint-plugins/no-relative-database-imports.ts"
+    ]
   },
   "tasks": {
     "check": "deno fmt && deno lint",

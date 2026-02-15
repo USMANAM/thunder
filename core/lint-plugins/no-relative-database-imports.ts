@@ -1,12 +1,12 @@
 import { containsCoreSegment, isRelative } from "./utils.ts";
 
 const plugin: Deno.lint.Plugin = {
-  name: "no-relative-core-imports",
+  name: "no-relative-database-imports",
   rules: {
-    "no-relative-core-imports": {
+    "no-relative-database-imports": {
       create(context) {
-        const TARGET = "core";
-        const ALIAS = "@/core/";
+        const TARGET = "database.ts";
+        const ALIAS = "@/database.ts";
 
         function report(
           _node:
@@ -15,21 +15,11 @@ const plugin: Deno.lint.Plugin = {
             | Deno.lint.ExportAllDeclaration,
           source: Deno.lint.StringLiteral,
         ) {
-          const spec = source.value;
-
           context.report({
             node: source,
             message:
-              `Relative import into "${TARGET}/" is forbidden. Use "${ALIAS}..." instead.`,
+              `Relative import to "${TARGET}" is forbidden. Use "${ALIAS}" instead.`,
             fix(fixer) {
-              const match = spec.match(
-                /^(?:\.{1,2}\/)+core\/(.+)$|^\.\/*core\/(.+)$/,
-              );
-
-              const rest = match?.[1] ?? match?.[2];
-
-              if (!rest) return [];
-
               const quote = context.sourceCode
                   .getText(source)
                   .startsWith("'")
@@ -38,7 +28,7 @@ const plugin: Deno.lint.Plugin = {
 
               return fixer.replaceTextRange(
                 source.range,
-                `${quote}${ALIAS}${rest}${quote}`,
+                `${quote}${ALIAS}${quote}`,
               );
             },
           });
