@@ -89,6 +89,6 @@ export const generateOpenAPIContent = async (
   });
 
   if (!opts.skipWrite) {
-    await writeJSONFile(outputPath, JSON.stringify(document, null, 2));
+    await writeJSONFile(outputPath, document);
   }
 };
