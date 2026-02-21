@@ -284,13 +284,13 @@ export class BaseSDK {
                 return callback();
             },
             then: ((resolve, reject) => {
-                return executors.res.then(resolve, reject);
+                return executors.data.then(resolve, reject);
             }) as Promise<T>["then"],
             catch: ((reject) => {
-                return executors.res.catch(reject);
+                return executors.data.catch(reject);
             }) as Promise<T>["catch"],
             finally: ((result) => {
-                return executors.res.finally(result);
+                return executors.data.finally(result);
             }) as Promise<T>["finally"],
         };
 
