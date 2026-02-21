@@ -79,7 +79,7 @@ export type TSDKModuleDetails = {
   methods: Record<string, TSDKMethodDetails>;
 };
 
-export const generateSDKModules = async (
+export const generateModules = async (
   routesDir: string,
   opts?: { cwd?: string },
 ) => {
@@ -274,7 +274,7 @@ export const generateSDKContent = async (
 
   const files: Record<string, string> = {};
 
-  const modules = await generateSDKModules(
+  const modules = await generateModules(
     opts?.routesDir ?? "./routes",
     { cwd },
   );
@@ -315,6 +315,7 @@ export const generateSDKContent = async (
         {
           ...context,
           ...details,
+          filename,
         },
       );
     }),
@@ -333,7 +334,7 @@ export const generateSDKContent = async (
 
   files["index.ts"] = await ejsRender(indexTemplate, {
     ...context,
-    modulesToImport: Object.values(modules).map((details) => details.name),
+    modulesToImport: modules,
     pluginsToImport: pluginNames,
   });
 

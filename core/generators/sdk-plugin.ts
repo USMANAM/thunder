@@ -4,13 +4,17 @@ import { ejsRender } from "../utils/ejsRender.ts";
 import { exists } from "@std/fs/exists";
 import { toFileUrl } from "@std/path/to-file-url";
 
-export const generateSDKPluginContent = async (opts: {
+export type TGenerateSDKPluginContentOpts = {
   name: string;
   outputPath?: string;
   cwd?: string;
   skipWrite?: boolean;
   generateSDKContentOpts?: TGenerateSDKContentOpts;
-}) => {
+};
+
+export const generateSDKPluginContent = async (
+  opts: TGenerateSDKPluginContentOpts,
+) => {
   const cwd = opts.cwd ?? Deno.cwd();
   const outputPath = join(
     cwd,
@@ -72,5 +76,8 @@ export const generateSDKPluginContent = async (opts: {
     );
   }
 
-  return files;
+  return {
+    outputPath,
+    files,
+  };
 };

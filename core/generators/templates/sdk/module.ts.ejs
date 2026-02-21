@@ -31,7 +31,7 @@ export const <%- name %>Module = (sdk: typeof BaseSDK) => ({
 
             sdk.checkPermission("<%- name %>", "<%- methodName %>");
 
-            const toPath = compile("<%- endpoint %>");
+            const toPath = compile("<%- filename.split(".ts")[0] %>/<%- endpoint %>");
 
             const res = await sdk._axios.request({
                 method: "<%- method %>",

@@ -6,12 +6,12 @@
 
 import { BaseSDK } from "./base.ts";
 
-<% for (const name of modulesToImport) { -%>
-import { <%- name %>Module } from "./modules/<%- name %>.ts";
+<% for (const [filename, { name }] of Object.entries(modulesToImport)) { -%>
+import { <%- name %>Module } from "./modules/<%- filename %>";
 <% } -%>
 
 export class ThunderSDK extends BaseSDK {
-<% for (const name of modulesToImport) { -%>
+<% for (const [, { name }] of Object.entries(modulesToImport)) { -%>
     static <%- name %> = <%- name %>Module(this);
 <% } -%>
 }
