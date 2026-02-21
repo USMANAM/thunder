@@ -33,7 +33,7 @@ if (import.meta.main) {
     prompt: true,
   });
 
-  console.log("Success");
+  console.info("Success");
 
   Deno.exit();
 }

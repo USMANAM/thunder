@@ -32,6 +32,8 @@
     "npm:mongodb@7": "7.0.0",
     "npm:path-to-regexp@^8.3.0": "8.3.0",
     "npm:qs@^6.14.1": "6.14.1",
+    "npm:typescript@^5.9.3": "5.9.3",
+    "npm:zod-to-ts@2": "2.0.0_typescript@5.9.3_zod@4.3.6",
     "npm:zod@^4.3.6": "4.3.6"
   },
   "jsr": {
@@ -358,6 +360,10 @@
         "punycode"
       ]
     },
+    "typescript@5.9.3": {
+      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+      "bin": true
+    },
     "webidl-conversions@7.0.0": {
       "integrity": "sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g=="
     },
@@ -366,6 +372,13 @@
       "dependencies": [
         "tr46",
         "webidl-conversions"
+      ]
+    },
+    "zod-to-ts@2.0.0_typescript@5.9.3_zod@4.3.6": {
+      "integrity": "sha512-aHsUgIl+CQutKAxtRNeZslLCLXoeuSq+j5HU7q3kvi/c2KIAo6q4YjT7/lwFfACxLB923ELHYMkHmlxiqFy4lw==",
+      "dependencies": [
+        "typescript",
+        "zod"
       ]
     },
     "zod@4.3.6": {
@@ -387,6 +400,8 @@
       "npm:mongodb@7",
       "npm:path-to-regexp@^8.3.0",
       "npm:qs@^6.14.1",
+      "npm:typescript@^5.9.3",
+      "npm:zod-to-ts@2",
       "npm:zod@^4.3.6"
     ]
   }

@@ -1,0 +1,358 @@
+import { expandGlob } from "@std/fs/expand-glob";
+import { toFileUrl } from "@std/path/to-file-url";
+import { join } from "@std/path/posix/join";
+import { dirname } from "@std/path/dirname";
+import { basename } from "@std/path/basename";
+import { relative } from "@std/path/relative";
+import { exists } from "@std/fs/exists";
+import { Router, THandlerIOShapes, TMethod } from "../http/router.ts";
+import {
+  createAuxiliaryTypeStore,
+  createTypeAlias,
+  printNode,
+  zodToTs,
+} from "zod-to-ts";
+import { ejsRender } from "../utils/ejsRender.ts";
+import { writeTextFile } from "../scripts/lib/utility.ts";
+import { denoConfig } from "../utils/denoConfig.ts";
+import { sh } from "../scripts/lib/sh.ts";
+
+export type TSDKMethodDetails = {
+  method: TMethod;
+  endpoint: string;
+
+  types: {
+    params?: string;
+    query?: string;
+    body?: string;
+    return?: string;
+  };
+};
+
+export const routerToMethods = (router: Router) => {
+  const auxiliaryTypeStore = createAuxiliaryTypeStore();
+  const methods: Record<string, TSDKMethodDetails> = {};
+
+  for (const [endpoint, { methods: httpMethods }] of router["registry"]) {
+    for (const [httpMethod, { name, handler }] of Object.entries(httpMethods)) {
+      let shapes: THandlerIOShapes | undefined;
+
+      if (typeof handler === "object" && typeof handler.shape === "function") {
+        shapes = handler.shape();
+      }
+
+      methods[name] = {
+        method: httpMethod as TMethod,
+        endpoint,
+        types: {},
+      };
+
+      const skipBody = !["post", "patch", "put"].includes(httpMethod);
+
+      if (shapes) {
+        for (const [_key] of Object.entries(shapes)) {
+          const key = _key as keyof THandlerIOShapes;
+          const shape = shapes[key];
+
+          if (!shape) continue;
+          if (skipBody && key === "body") continue;
+
+          const { node } = zodToTs(shape, {
+            auxiliaryTypeStore,
+          });
+
+          const typeAlias = createTypeAlias(node, `${name}$${key}`);
+
+          const typeString = printNode(typeAlias);
+
+          methods[name].types[key] = typeString;
+        }
+      }
+    }
+  }
+
+  return methods;
+};
+
+export type TSDKModuleDetails = {
+  name: string;
+  methods: Record<string, TSDKMethodDetails>;
+};
+
+export const generateSDKModules = async (
+  routesDir: string,
+  opts?: { cwd?: string },
+) => {
+  const modules: Record<string, TSDKModuleDetails> = {};
+
+  for await (
+    const entry of expandGlob("./**/*.ts", {
+      root: join(opts?.cwd, routesDir),
+      globstar: true,
+    })
+  ) {
+    if (modules[entry.name]) {
+      console.warn(`Duplicate router detected ${entry.name}`);
+    }
+
+    const { default: router } = await import(toFileUrl(entry.path).href);
+
+    const methods = routerToMethods(router);
+
+    modules[entry.name] = {
+      name: router.name,
+      methods,
+    };
+  }
+
+  return modules;
+};
+
+export interface IPackageJSON {
+  name: string;
+  version: string;
+  private?: boolean;
+  main?: string;
+  scripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+
+  [K: string]: unknown;
+}
+
+export const createPackageJSON = (
+  opts?: Partial<IPackageJSON>,
+): IPackageJSON => ({
+  name: opts?.name ?? "thunder-sdk",
+  version: "0.0.0",
+  private: true,
+  main: "./dist/index.js",
+  scripts: {
+    build: "tsc",
+  },
+  author: denoConfig.name,
+  license: "MIT",
+  homepage: denoConfig.homepage,
+  ...opts,
+});
+
+export const generateNpmModule = async (opts: {
+  sdkDir: string;
+}) => {
+  const script = "./scripts/buildNpm.ts";
+
+  const scriptPath = join(opts.sdkDir, script);
+  const modulePath = join(opts.sdkDir, "npm");
+
+  const packageJSON = createPackageJSON({
+    private: undefined,
+    main: undefined,
+    scripts: undefined,
+  });
+
+  await writeTextFile(
+    scriptPath,
+    `
+    import { build, emptyDir } from "jsr:@deno/dnt";
+
+    await emptyDir("./npm");
+
+    await build({
+      entryPoints: ["./index.ts"],
+      outDir: "./npm",
+      shims: {
+        // see JS docs for overview and more options
+        deno: true,
+      },
+      package: ${JSON.stringify(packageJSON)},
+    });
+    `,
+  );
+
+  await sh(["deno", "run", "-A", script], { cwd: opts.sdkDir });
+  await sh(["npm", "pack"], { cwd: modulePath });
+
+  const CurrentTarballPath = join(
+    modulePath,
+    `${packageJSON.name}-${packageJSON.version}.tgz`,
+  );
+  const NewTarballPath = join(opts.sdkDir, "package.tgz");
+
+  await Deno.rename(CurrentTarballPath, NewTarballPath);
+};
+
+export const syncPluginContent = async (opts: {
+  sdkDir: string;
+  pluginDir: string;
+}) => {
+  const pluginFiles: Record<string, string> = {};
+  const pluginNames: string[] = [];
+
+  for await (
+    const entry of expandGlob(
+      "./**/deno.json",
+      {
+        root: opts.pluginDir,
+        globstar: true,
+      },
+    )
+  ) {
+    const pluginDir = dirname(entry.path);
+    const pluginName = basename(pluginDir);
+
+    pluginNames.push(pluginName);
+
+    for await (
+      const subEntry of expandGlob("**/**/*", {
+        root: pluginDir,
+        globstar: true,
+      })
+    ) {
+      if (
+        !subEntry.isDirectory &&
+        // Do not copy these files and folders
+        [
+          ".git",
+          ".vscode",
+          "node_modules",
+        ].reduce(
+          (allow, ignore) =>
+            allow &&
+            !subEntry.path.includes(ignore),
+          true,
+        )
+      ) {
+        const content = await Deno.readTextFile(subEntry.path);
+        const filePath = `plugins/${pluginName}/${
+          relative(pluginDir, subEntry.path)
+        }`;
+
+        pluginFiles[filePath] = content.replace(
+          /from\s*"thunder-sdk"/g,
+          `from "${
+            relative(
+              dirname(join(opts.sdkDir, filePath)),
+              join(opts.sdkDir, "index.ts"),
+            ).replace(/\\/g, "/")
+          }"`,
+        );
+      }
+    }
+  }
+
+  return {
+    pluginNames,
+    pluginFiles,
+  };
+};
+
+export type TGenerateSDKContentOpts = {
+  name?: string;
+  version?: string;
+  routesDir?: string;
+  pluginDir?: string;
+  outputDir?: string;
+  cwd?: string;
+  skipWrite?: boolean;
+  skipNpmBuild?: boolean;
+};
+
+export const generateSDKContent = async (
+  opts?: TGenerateSDKContentOpts,
+) => {
+  const cwd = opts?.cwd ?? Deno.cwd();
+  const name = opts?.name ?? "thunder-sdk";
+  const version = opts?.version ?? "0.0.1";
+  const outputPath = join(
+    cwd,
+    (opts?.outputDir ?? "./public/www/") + `sdk@${version}`,
+  );
+
+  if (await exists(outputPath)) {
+    throw new Error("SDK content already exists!");
+  }
+
+  const files: Record<string, string> = {};
+
+  const modules = await generateSDKModules(
+    opts?.routesDir ?? "./routes",
+    { cwd },
+  );
+
+  const [
+    baseTemplate,
+    indexTemplate,
+    typesTemplate,
+    denoJsonTemplate,
+    moduleTemplate,
+  ] = await Promise.all([
+    Deno.readTextFile(
+      join(import.meta.dirname, "./templates/sdk/base.ts.ejs"),
+    ),
+    Deno.readTextFile(
+      join(import.meta.dirname, "./templates/sdk/index.ts.ejs"),
+    ),
+    Deno.readTextFile(
+      join(import.meta.dirname, "./templates/sdk/types.ts.ejs"),
+    ),
+    Deno.readTextFile(
+      join(import.meta.dirname, "./templates/sdk/deno.json.ejs"),
+    ),
+    Deno.readTextFile(
+      join(import.meta.dirname, "./templates/sdk/module.ts.ejs"),
+    ),
+  ]);
+
+  const context = {
+    packageName: name,
+    packageVersion: version,
+  };
+
+  await Promise.all(
+    Object.entries(modules).map(async ([filename, details]) => {
+      files[join("modules", filename)] = await ejsRender(
+        moduleTemplate,
+        {
+          ...context,
+          ...details,
+        },
+      );
+    }),
+  );
+
+  files["base.ts"] = await ejsRender(baseTemplate, context);
+  files["types.ts"] = await ejsRender(typesTemplate, context);
+  files["deno.json"] = await ejsRender(denoJsonTemplate, context);
+
+  const { pluginNames, pluginFiles } = await syncPluginContent({
+    pluginDir: join(opts?.cwd, opts?.pluginDir ?? "./sdk-plugins"),
+    sdkDir: outputPath,
+  });
+
+  Object.assign(files, pluginFiles);
+
+  files["index.ts"] = await ejsRender(indexTemplate, {
+    ...context,
+    modulesToImport: Object.values(modules).map((details) => details.name),
+    pluginsToImport: pluginNames,
+  });
+
+  if (!opts?.skipWrite) {
+    await Promise.all(
+      Object.entries(files).map(([filename, content]) =>
+        writeTextFile(join(outputPath, filename), content)
+      ),
+    );
+
+    if (!opts?.skipNpmBuild) {
+      await generateNpmModule({
+        sdkDir: outputPath,
+      });
+    }
+  }
+
+  return {
+    outputPath,
+    files,
+  };
+};

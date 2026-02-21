@@ -1,0 +1,17 @@
+/**
+ * Copyright © Huruf Tech <%- new Date().getFullYear() %>
+ *
+ * This is a generated file. Do not edit the contents of this file!
+ */
+
+import { BaseSDK } from "./base.ts";
+
+<% for (const name of modulesToImport) { -%>
+import { <%- name %>Module } from "./modules/<%- name %>.ts";
+<% } -%>
+
+export class ThunderSDK extends BaseSDK {
+<% for (const name of modulesToImport) { -%>
+    static <%- name %> = <%- name %>Module(this);
+<% } -%>
+}

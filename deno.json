@@ -13,7 +13,9 @@
     "update:core": "deno run -A ./core/scripts/updateCore.ts",
     "add:plugin": "deno run -A ./core/scripts/addPlugin.ts",
     "update:plugin": "deno run -A ./core/scripts/updatePlugin.ts",
-    "remove:plugin": "deno run -A ./core/scripts/removePlugin.ts"
+    "remove:plugin": "deno run -A ./core/scripts/removePlugin.ts",
+    "generate:sdk": "deno run -A ./core/scripts/generateSDK.ts",
+    "generate:sdk:plugin": "deno run -A ./core/scripts/generateSDKPlugin.ts"
   },
   "imports": {
     "@/": "./",
@@ -30,7 +32,9 @@
     "mongodb": "npm:mongodb@^7.0.0",
     "path-to-regexp": "npm:path-to-regexp@^8.3.0",
     "qs": "npm:qs@^6.14.1",
-    "zod": "npm:zod@^4.3.6"
+    "typescript": "npm:typescript@^5.9.3",
+    "zod": "npm:zod@^4.3.6",
+    "zod-to-ts": "npm:zod-to-ts@^2.0.0"
   },
   "scopes": {}
 }

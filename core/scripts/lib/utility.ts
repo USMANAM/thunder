@@ -53,14 +53,28 @@ export const nodeReadableToDenoReadableStream = (nodeReadable: Readable) => {
   });
 };
 
-export const writeJSONFile = (path: string, data: any) =>
-  Deno.writeTextFile(
+export const writeTextFile = async (
+  path: string,
+  data: string | ReadableStream<string>,
+  options?: Deno.WriteFileOptions,
+) => {
+  await Deno.mkdir(dirname(path), { recursive: true });
+  await Deno.writeTextFile(path, data, options);
+};
+
+export const writeJSONFile = (
+  path: string,
+  data: any,
+  options?: Deno.WriteFileOptions,
+) =>
+  writeTextFile(
     path,
     JSON.stringify(
       data,
       undefined,
       2,
     ),
+    options,
   );
 
 export const symlink = async (target: string, linkPath: string) => {

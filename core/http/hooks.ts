@@ -1,4 +1,4 @@
-import { expandGlob } from "@std/fs";
+import { expandGlob } from "@std/fs/expand-glob";
 import { join } from "@std/path/join";
 import { toFileUrl } from "@std/path/to-file-url";
 import { hooksCache } from "./constants.ts";

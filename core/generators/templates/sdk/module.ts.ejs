@@ -1,0 +1,52 @@
+import type { TRequestOptions } from "../types.ts";
+import type { BaseSDK } from "../base.ts";
+
+import { compile } from "path-to-regexp";
+
+<% for (const [, { types }] of Object.entries(methods)) { -%>
+<% if(types.params) { -%>
+export <%- types.params %>
+<% } -%>
+<% if(types.query) { -%>
+export <%- types.query %>
+<% } -%>
+<% if(types.body) { -%>
+export <%- types.body %>
+<% } -%>
+<% if(types.return) { -%>
+export <%- types.return %>
+<% } -%>
+<% } -%>
+
+export const <%- name %>Module = (sdk: typeof BaseSDK) => ({
+<% for (const [methodName, { types, method, endpoint }] of Object.entries(methods)) { -%>
+    <% const isDataOptional = !types.params && !types.query && !types.body; -%>
+    <%- methodName %>(data<%- isDataOptional ? "?" : "" %>: {
+        params<%- !types.params ? "?" : "" %>: <%- !types.params ? "undefined" : methodName + "$params" %>,
+        query<%- !types.query ? "?" : "" %>: <%- !types.query ? "undefined" : methodName + "$query" %>,
+        body<%- !types.body ? "?" : "" %>: <%- !types.body ? "undefined" : methodName + "$body" %>,
+    } & TRequestOptions<<%- !types.return ? "unknown" : methodName + "$return" %>>) {
+        return sdk.resolveAxiosResponse(async () => {
+            if (!sdk._axios) throw new Error("Axios not initialized!");
+
+            sdk.checkPermission("<%- name %>", "<%- methodName %>");
+
+            const toPath = compile("<%- endpoint %>");
+
+            const res = await sdk._axios.request({
+                method: "<%- method %>",
+                url: toPath(data?.params),
+                params: data?.query,
+                data: data?.body,
+                signal: data?.signal,
+                ...(data?.axiosConfig
+                ? sdk.resolveAxiosConfig(data.axiosConfig)
+                : undefined),
+            });
+
+            return res;
+        }, data);
+    },
+<% } -%>
+} as const);
+

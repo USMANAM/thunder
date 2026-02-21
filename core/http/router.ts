@@ -8,14 +8,15 @@ export type TResponse = Response | Promise<Response>;
 export type THandler = (req: Request) => TResponse;
 export type TNextFunction = () => TResponse;
 export type TMiddleware = (req: Request, next: TNextFunction) => TResponse;
-export type THandlerIOShapes = () => {
+export type THandlerIOShapes = {
   params?: z.ZodType;
   query?: z.ZodType;
   body?: z.ZodType;
   return?: z.ZodType;
 };
+export type TPrepareHandlerIOShapes = () => THandlerIOShapes;
 export type THandlerOpts = {
-  shape?: THandlerIOShapes;
+  shape?: TPrepareHandlerIOShapes;
   handler: THandler;
 };
 export type TPreparedHandler = THandlerOpts | THandler;
@@ -38,8 +39,8 @@ export type TRegisterFn = (
 ) => void;
 
 export class Router {
-  protected name: string;
   protected parser?: MatchFunction<Record<string, string>>;
+  protected methodNames = new Set<string>();
   protected registry: Map<
     string,
     {
@@ -52,6 +53,8 @@ export class Router {
       };
     }
   > = new Map();
+
+  public name: string;
 
   constructor(
     registerFn: TRegisterFn,
@@ -102,6 +105,14 @@ export class Router {
       throw new Error("A named function should be passed to route handler!");
     }
 
+    if (this.methodNames.has(prepare.name)) {
+      throw new Error(
+        `An endpoint function with same name '${prepare.name}' already exists in this router!`,
+      );
+    }
+
+    this.methodNames.add(prepare.name);
+
     const resolvedMethod = method || "all";
 
     const routing = this.registry.get(endpoint);
@@ -120,7 +131,11 @@ export class Router {
       return this;
     }
 
-    if (routing.methods[resolvedMethod]) return this;
+    if (routing.methods[resolvedMethod]) {
+      throw new Error(
+        "Defining two routes with same endpoint and method is ambiguous!",
+      );
+    }
 
     routing.methods[resolvedMethod] = {
       name: prepare.name,

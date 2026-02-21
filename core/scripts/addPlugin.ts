@@ -85,7 +85,7 @@ export const linkPlugin = async (name: string, opts?: { cwd?: string }) => {
   await Deno.mkdir(targetPath, { recursive: true });
 
   const globPatterns = [
-    "{routes,schemas,hooks,lib,public}/**/*",
+    "{routes,schemas,hooks,lib,public,sdk-plugins}/**/*",
   ];
 
   for (const pattern of globPatterns) {
@@ -124,6 +124,11 @@ export const linkPlugin = async (name: string, opts?: { cwd?: string }) => {
   await symlink(
     join(targetPath, "./hooks"),
     join(cwd, "./hooks", name),
+  );
+
+  await symlink(
+    join(targetPath, "./sdk-plugins"),
+    join(cwd, "./sdk-plugins", name),
   );
 };
 
@@ -179,7 +184,7 @@ if (import.meta.main) {
     prompt: true,
   });
 
-  console.log("Success");
+  console.info("Success");
 
   Deno.exit();
 }
