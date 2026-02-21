@@ -83,5 +83,5 @@ export const generateOpenAPIContent = async (
     paths,
   });
 
-  console.log(document);
+  console.log(JSON.stringify(document, null, 2));
 };

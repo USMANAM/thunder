@@ -9,14 +9,19 @@ export default new Router("/", function index(router) {
       endpoint: z.array(z.string()).optional(),
     });
 
-    return (req) => {
-      const { endpoint } = $params.parse(paramsAsJson(req));
+    return {
+      shape: () => ({
+        params: $params,
+      }),
+      handler: (req) => {
+        const { endpoint } = $params.parse(paramsAsJson(req));
 
-      return serveAssets(
-        req,
-        fromFileUrl(import.meta.resolve("../public/www")),
-        endpoint?.join("/"),
-      );
+        return serveAssets(
+          req,
+          fromFileUrl(import.meta.resolve("../public/www")),
+          endpoint?.join("/"),
+        );
+      },
     };
   });
 });
