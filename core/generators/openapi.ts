@@ -1,6 +1,7 @@
 import { createDocument, ZodOpenApiPathsObject } from "zod-openapi";
-// import { join } from "@std/path/posix/join";
+import { join } from "@std/path/posix/join";
 import { generateModules } from "./sdk.ts";
+import { writeJSONFile } from "../scripts/lib/utility.ts";
 
 export type TGenerateOpenAPIContentOpts = {
   title?: string;
@@ -8,7 +9,6 @@ export type TGenerateOpenAPIContentOpts = {
   routesDir?: string;
   outputDir?: string;
   cwd?: string;
-  overwrite?: boolean;
   skipWrite?: boolean;
 };
 
@@ -18,10 +18,11 @@ export const generateOpenAPIContent = async (
   const cwd = opts?.cwd ?? Deno.cwd();
   const title = opts?.title ?? "thunder-api";
   const version = opts?.version ?? "0.0.0";
-  //   const outputPath = join(
-  //     cwd,
-  //     opts?.outputDir ?? "./public/www",
-  //   );
+  const outputPath = join(
+    cwd,
+    opts?.outputDir ?? "./public/www",
+    "openapi-spec.json",
+  );
 
   const paths: ZodOpenApiPathsObject = {};
 
@@ -32,12 +33,16 @@ export const generateOpenAPIContent = async (
 
   for (const [_, moduleDetails] of Object.entries(modules)) {
     for (
-      const [method, methodDetails] of Object.entries(moduleDetails.methods)
+      const [_, methodDetails] of Object.entries(moduleDetails.methods)
     ) {
       const path = paths[`${moduleDetails.name}${methodDetails.endpoint}`] ??=
         {};
 
-      path[method as "get"] = {
+      const method = methodDetails.method === "all"
+        ? "get"
+        : methodDetails.method;
+
+      path[method] = {
         requestParams: {
           ...(methodDetails.shapes?.headers
             ? { header: methodDetails.shapes.headers }
@@ -83,5 +88,7 @@ export const generateOpenAPIContent = async (
     paths,
   });
 
-  console.log(JSON.stringify(document, null, 2));
+  if (!opts.skipWrite) {
+    await writeJSONFile(outputPath, JSON.stringify(document, null, 2));
+  }
 };
