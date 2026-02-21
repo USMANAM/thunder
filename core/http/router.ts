@@ -9,8 +9,9 @@ export type THandler = (req: Request) => TResponse;
 export type TNextFunction = () => TResponse;
 export type TMiddleware = (req: Request, next: TNextFunction) => TResponse;
 export type THandlerIOShapes = {
-  params?: z.ZodType;
-  query?: z.ZodType;
+  headers?: z.ZodType<Record<string, unknown>, Record<string, unknown>>;
+  params?: z.ZodType<Record<string, unknown>, Record<string, unknown>>;
+  query?: z.ZodType<Record<string, unknown>, Record<string, unknown>>;
   body?: z.ZodType;
   return?: z.ZodType;
 };

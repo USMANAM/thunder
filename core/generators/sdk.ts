@@ -21,7 +21,9 @@ export type TSDKMethodDetails = {
   method: TMethod;
   endpoint: string;
 
+  shapes: THandlerIOShapes | undefined;
   types: {
+    headers?: string;
     params?: string;
     query?: string;
     body?: string;
@@ -29,7 +31,9 @@ export type TSDKMethodDetails = {
   };
 };
 
-export const routerToMethods = (router: Router) => {
+export const routerToMethods = (router: Router, opts?: {
+  skipBuildTypes?: boolean;
+}) => {
   const auxiliaryTypeStore = createAuxiliaryTypeStore();
   const methods: Record<string, TSDKMethodDetails> = {};
 
@@ -44,12 +48,13 @@ export const routerToMethods = (router: Router) => {
       methods[name] = {
         method: httpMethod as TMethod,
         endpoint,
+        shapes,
         types: {},
       };
 
       const skipBody = !["post", "patch", "put"].includes(httpMethod);
 
-      if (shapes) {
+      if (shapes && !opts?.skipBuildTypes) {
         for (const [_key] of Object.entries(shapes)) {
           const key = _key as keyof THandlerIOShapes;
           const shape = shapes[key];
