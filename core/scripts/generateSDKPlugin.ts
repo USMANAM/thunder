@@ -4,6 +4,7 @@ import { generateSDKPluginContent } from "../generators/sdk-plugin.ts";
 export const generateSDKPlugin = async (opts?: {
   name?: string;
   version?: string;
+  overwrite?: boolean;
 }) => {
   const name = opts?.name;
 
@@ -16,15 +17,17 @@ export const generateSDKPlugin = async (opts?: {
       cwd: Deno.cwd(),
       version: opts?.version,
     },
+    overwrite: opts.overwrite,
   });
 };
 
 if (import.meta.main) {
-  const { name, n, version, v } = parseArgs(Deno.args);
+  const { name, n, version, v, overwrite } = parseArgs(Deno.args);
 
   await generateSDKPlugin({
     name: name ?? n,
     version: version ?? v,
+    overwrite,
   });
 
   console.info("SDK plugin has been generated");

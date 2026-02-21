@@ -27,8 +27,6 @@ export const <%- name %>Module = (sdk: typeof BaseSDK) => ({
         body<%- !types.body ? "?" : "" %>: <%- !types.body ? "undefined" : methodName + "$body" %>,
     } & TRequestOptions<<%- !types.return ? "unknown" : methodName + "$return" %>>) {
         return sdk.resolveAxiosResponse(async () => {
-            if (!sdk._axios) throw new Error("Axios not initialized!");
-
             sdk.checkPermission("<%- name %>", "<%- methodName %>");
 
             const toPath = compile("<%- filename.split(".ts")[0] %><%- endpoint %>");

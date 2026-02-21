@@ -253,6 +253,7 @@ export type TGenerateSDKContentOpts = {
   pluginDir?: string;
   outputDir?: string;
   cwd?: string;
+  overwrite?: boolean;
   skipWrite?: boolean;
   skipNpmBuild?: boolean;
 };
@@ -268,7 +269,7 @@ export const generateSDKContent = async (
     (opts?.outputDir ?? "./public/www/") + `sdk@${version}`,
   );
 
-  if (await exists(outputPath)) {
+  if (!opts?.overwrite && !opts?.skipWrite && await exists(outputPath)) {
     throw new Error("SDK content already exists!");
   }
 

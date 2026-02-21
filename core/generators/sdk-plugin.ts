@@ -8,6 +8,7 @@ export type TGenerateSDKPluginContentOpts = {
   name: string;
   outputPath?: string;
   cwd?: string;
+  overwrite?: boolean;
   skipWrite?: boolean;
   generateSDKContentOpts?: TGenerateSDKContentOpts;
 };
@@ -21,7 +22,7 @@ export const generateSDKPluginContent = async (
     (opts.outputPath ?? "./sdk-plugins/") + opts.name,
   );
 
-  if (await exists(outputPath)) {
+  if (!opts?.overwrite && !opts?.skipWrite && await exists(outputPath)) {
     throw new Error("Plugin content already exists!");
   }
 
