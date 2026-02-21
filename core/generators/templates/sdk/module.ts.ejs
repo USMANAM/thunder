@@ -31,7 +31,7 @@ export const <%- name %>Module = (sdk: typeof BaseSDK) => ({
 
             const toPath = compile("<%- filename.split(".ts")[0] %><%- endpoint %>");
 
-            const res = await sdk._axios.request({
+            const res = await sdk._axios!.request({
                 method: "<%- method %>",
                 url: toPath(data?.params),
                 params: data?.query,
