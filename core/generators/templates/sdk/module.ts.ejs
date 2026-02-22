@@ -18,7 +18,8 @@ export <%- types.return %>
 <% } -%>
 <% } -%>
 
-export const <%- name %>Module = (sdk: typeof BaseSDK) => ({
+export const <%- name %>Module = (sdk: typeof BaseSDK) => {
+    const methods = {
 <% for (const [methodName, { types, method, endpoint }] of Object.entries(methods)) { -%>
     <% const isDataOptional = !types.params && !types.query && !types.body; -%>
     <%- methodName %>(data<%- isDataOptional ? "?" : "" %>: {
@@ -46,5 +47,11 @@ export const <%- name %>Module = (sdk: typeof BaseSDK) => ({
         }, data);
     },
 <% } -%>
-} as const);
+    } as const;
 
+<% for (const [methodName] of Object.entries(methods)) { -%>
+    (methods.<%- methodName %> as any).__scope = "<%- name %>";
+<% } -%>
+
+    return methods;
+};
