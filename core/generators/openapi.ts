@@ -1,7 +1,12 @@
-import { createDocument, ZodOpenApiPathsObject } from "zod-openapi";
+import {
+  createDocument,
+  ZodOpenApiPathItemObject,
+  ZodOpenApiPathsObject,
+} from "zod-openapi";
 import { join } from "@std/path/posix/join";
 import { generateModules } from "./sdk.ts";
 import { writeJSONFile } from "../scripts/lib/utility.ts";
+import { toOpenApiPaths } from "./utils/toOpenAPIPaths.ts";
 
 export type TGenerateOpenAPIContentOpts = {
   title?: string;
@@ -24,6 +29,7 @@ export const generateOpenAPIContent = async (
     "openapi-spec.json",
   );
 
+  const tags = new Set<string>();
   const paths: ZodOpenApiPathsObject = {};
 
   const modules = await generateModules(
@@ -35,14 +41,15 @@ export const generateOpenAPIContent = async (
     for (
       const [_, methodDetails] of Object.entries(moduleDetails.methods)
     ) {
-      const path = paths[`${moduleDetails.name}${methodDetails.endpoint}`] ??=
-        {};
+      const path: ZodOpenApiPathItemObject = {};
 
       const method = methodDetails.method === "all"
         ? "get"
         : methodDetails.method;
 
+      tags.add(moduleDetails.name);
       path[method] = {
+        tags: [moduleDetails.name],
         requestParams: {
           ...(methodDetails.shapes?.headers
             ? { header: methodDetails.shapes.headers }
@@ -76,6 +83,12 @@ export const generateOpenAPIContent = async (
           },
         },
       };
+
+      toOpenApiPaths(`/${moduleDetails.name}${methodDetails.endpoint}`).forEach(
+        (endpoint) => {
+          paths[endpoint] = path;
+        },
+      );
     }
   }
 
@@ -85,6 +98,7 @@ export const generateOpenAPIContent = async (
       title,
       version,
     },
+    tags: Array.from(tags).map((name) => ({ name })),
     paths,
   });
 

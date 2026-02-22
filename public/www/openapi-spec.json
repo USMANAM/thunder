@@ -1,0 +1,78 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "thunder-sdk",
+    "version": "0.0.1"
+  },
+  "tags": [
+    {
+      "name": "home"
+    },
+    {
+      "name": "index"
+    }
+  ],
+  "paths": {
+    "/home": {
+      "get": {
+        "tags": [
+          "home"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "200 OK"
+          }
+        }
+      }
+    },
+    "/index": {
+      "get": {
+        "tags": [
+          "index"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200 OK"
+          }
+        }
+      }
+    },
+    "/index/{endpoint}": {
+      "get": {
+        "tags": [
+          "index"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpoint",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200 OK"
+          }
+        }
+      }
+    }
+  }
+}
