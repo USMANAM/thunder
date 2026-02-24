@@ -6,15 +6,19 @@ import { hooksCache } from "./constants.ts";
 export type THook = {
   priority?: number;
   pre?: (
-    scope: string,
-    name: string,
-    req: Request,
+    ctx: {
+      req: Request;
+      scope: string;
+      name?: string;
+    },
   ) => Response | void | Promise<Response | void>;
   post?: (
-    scope: string,
-    name: string,
-    req: Request,
-    res: Response,
+    ctx: {
+      req: Request;
+      res: Response;
+      scope: string;
+      name?: string;
+    },
   ) => Response | void | Promise<Response | void>;
 };
 

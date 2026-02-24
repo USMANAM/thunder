@@ -164,6 +164,32 @@ export class Router {
   protected all: TRegisterMethod = (path, prepare) =>
     this.registerMethod(path, prepare);
 
+  protected tryHandle = async (callback: () => Promise<Response>) => {
+    try {
+      return await callback();
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return Response.json({
+          error: z.prettifyError(error),
+        }, { status: 400 });
+      }
+
+      if (error instanceof Response) {
+        return error;
+      }
+
+      return Response.json({
+        error: error instanceof Error
+          ? {
+            message: error.message,
+            name: error.name,
+            stack: Env.is(EnvType.DEVELOPMENT) ? error.stack : undefined,
+          }
+          : error,
+      }, { status: 500 });
+    }
+  };
+
   public route(method: TMethod, endpoint: string) {
     let targetEndpoint = endpoint;
 
@@ -182,47 +208,20 @@ export class Router {
 
       if (!match) continue;
 
-      const handlerObj = routing.methods[method] || routing.methods["all"];
+      const handlerObj = routing.methods[method] || routing.methods["all"] ||
+        { name: undefined, handler: undefined };
 
       if (handlerObj) {
         return async (req: Request, ...hooks: THook[]) => {
-          const tryHandle = async (callback: () => Promise<Response>) => {
-            try {
-              return await callback();
-            } catch (error) {
-              if (error instanceof ZodError) {
-                return Response.json({
-                  error: z.prettifyError(error),
-                }, { status: 400 });
-              }
-
-              if (error instanceof Response) {
-                return error;
-              }
-
-              return Response.json({
-                error: error instanceof Error
-                  ? {
-                    message: error.message,
-                    name: error.name,
-                    stack: Env.is(EnvType.DEVELOPMENT)
-                      ? error.stack
-                      : undefined,
-                  }
-                  : error,
-              }, { status: 500 });
-            }
-          };
-
-          return await tryHandle(async () => {
-            const res = await tryHandle(async () => {
+          return await this.tryHandle(async () => {
+            const res = await this.tryHandle(async () => {
               for (const hook of hooks) {
                 if (typeof hook.pre === "function") {
-                  const hookRes = await hook.pre(
-                    this.name,
-                    handlerObj.name,
+                  const hookRes = await hook.pre({
                     req,
-                  );
+                    scope: this.name,
+                    name: handlerObj.name,
+                  });
 
                   if (hookRes instanceof Response) return hookRes;
                 }
@@ -235,18 +234,19 @@ export class Router {
               if (typeof handler === "function") {
                 return await handler(req);
               } else {
-                return await handler.handler(req);
+                return await handler?.handler(req) ??
+                  new Response("Not found", { status: 404 });
               }
             });
 
             for (const hook of hooks) {
               if (typeof hook.post === "function") {
-                const hookRes = await hook.post(
-                  this.name,
-                  handlerObj.name,
+                const hookRes = await hook.post({
                   req,
                   res,
-                );
+                  scope: this.name,
+                  name: handlerObj.name,
+                });
 
                 if (hookRes instanceof Response) return hookRes;
               }
