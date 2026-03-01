@@ -17,7 +17,13 @@ export const queryAsJson = (req: Request, opts?: IParseOptions) => {
   return parseQueryParams(url.search, opts);
 };
 
-export const bodyAsJson = (req: Request) => req.json();
+export const bodyAsJson = async (req: Request) => {
+  try {
+    return await req.json();
+  } catch {
+    return Object.fromEntries(new URLSearchParams(await req.text()));
+  }
+};
 
 export const serveAssets = async (
   req: Request,
@@ -54,4 +60,16 @@ export const serveAssets = async (
       return res;
     },
   );
+};
+
+export const parseBasicAuth = (req: Request) => {
+  const authorization = req.headers?.get("authorization");
+  const base64Credentials = authorization?.replace(/^Basic\s+/i, "");
+
+  if (!base64Credentials) return null;
+
+  const credentials = atob(base64Credentials);
+  const [username, password] = credentials.split(":");
+
+  return { username, password } as const;
 };

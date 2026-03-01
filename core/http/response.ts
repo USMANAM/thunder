@@ -10,4 +10,25 @@ export class Response extends globalThis.Response {
   static unauthorized(data?: BodyInit, init?: ResponseInit) {
     return new Response(data ?? "Unauthorized", init ?? { status: 401 });
   }
+
+  static forbidden(data?: BodyInit, init?: ResponseInit) {
+    return new Response(data ?? "Forbidden", init ?? { status: 403 });
+  }
+
+  static badRequest(data?: BodyInit, init?: ResponseInit) {
+    return new Response(data ?? "Bad Request", init ?? { status: 400 });
+  }
+
+  static notFound(data?: BodyInit, init?: ResponseInit) {
+    return new Response(data ?? "Not Found", init ?? { status: 404 });
+  }
+
+  static override redirect(url: string | URL, status?: number) {
+    return new Response(null, {
+      status: status ?? 302,
+      headers: {
+        Location: url.toString(),
+      },
+    });
+  }
 }

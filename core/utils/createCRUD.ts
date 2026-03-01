@@ -20,9 +20,15 @@ export type TCrudOptions<T extends z.ZodObject> = {
     update?: boolean;
     del?: boolean;
   };
-  isolationFields?: (req: Request) => {
-    [K in keyof z.infer<T>]?: unknown;
-  };
+  isolationFields?: (req: Request) =>
+    | {
+      [K in keyof z.infer<T>]?: unknown;
+    }
+    | Promise<
+      {
+        [K in keyof z.infer<T>]?: unknown;
+      }
+    >;
 };
 
 export const createCRUD = <T extends z.ZodObject>(
@@ -33,7 +39,7 @@ export const createCRUD = <T extends z.ZodObject>(
     details.router.post("/", function create() {
       const $body = details.insertSchema ?? details.schema;
       const $return = z.object({
-        _id: z.instanceof(ObjectId),
+        _id: z.string(),
       });
 
       return {
@@ -66,7 +72,7 @@ export const createCRUD = <T extends z.ZodObject>(
       });
       const $return = z.object({
         results: z.array(details.schema.extend({
-          _id: z.instanceof(ObjectId),
+          _id: z.string(),
         })),
       });
 
