@@ -5,13 +5,14 @@ import { dirname } from "@std/path/dirname";
 import { basename } from "@std/path/basename";
 import { relative } from "@std/path/relative";
 import { exists } from "@std/fs/exists";
-import { Router, THandlerIOShapes, TMethod } from "../http/router.ts";
+import z from "zod";
 import {
   createAuxiliaryTypeStore,
   createTypeAlias,
   printNode,
   zodToTs,
-} from "zod-to-ts";
+} from "@oridune/zod-to-ts";
+import { Router, THandlerIOShapes, TMethod } from "../http/router.ts";
 import { ejsRender } from "../utils/ejsRender.ts";
 import { writeTextFile } from "../scripts/lib/utility.ts";
 import { denoConfig } from "../utils/denoConfig.ts";
@@ -64,6 +65,13 @@ export const routerToMethods = (router: Router, opts?: {
 
           const { node } = zodToTs(shape, {
             auxiliaryTypeStore,
+            overrideFunction: (schema, ts) => {
+              if (schema instanceof z.ZodCustom) {
+                return ts.factory.createTypeReferenceNode(
+                  ts.factory.createIdentifier("unknown"),
+                );
+              }
+            },
           });
 
           const typeAlias = createTypeAlias(node, `${name}$${key}`);
