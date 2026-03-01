@@ -67,8 +67,16 @@ export const routerToMethods = (router: Router, opts?: {
             auxiliaryTypeStore,
             overrideFunction: (schema, ts) => {
               if (schema instanceof z.ZodCustom) {
+                const meta = schema.meta();
+
+                let type = "unknown";
+
+                if (typeof meta?.tsType === "string") {
+                  type = meta.tsType;
+                }
+
                 return ts.factory.createTypeReferenceNode(
-                  ts.factory.createIdentifier("unknown"),
+                  ts.factory.createIdentifier(type),
                 );
               }
             },
