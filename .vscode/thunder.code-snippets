@@ -96,7 +96,7 @@
       "});",
       "",
       "export const $1Schema = $1InputSchema.extend({",
-      "\tcreatedBy: z.instanceof(ObjectId),",
+      "\tcreatedBy: z.instanceof(ObjectId).meta({ tsType: \"string\" }),",
       "\tcreatedAt: z.date().optional().default(() => new Date()),",
       "\tupdatedAt: z.date().optional().default(() => new Date()),",
       "});",

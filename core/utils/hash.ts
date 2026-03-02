@@ -31,5 +31,8 @@ export const createHashBase64 = async (alg: HashAlg, data: string) => {
     ...new Uint8Array(await crypto.subtle.digest(alg, DataUint8)),
   );
 
-  return btoa(Hash);
+  return btoa(Hash)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 };

@@ -53,7 +53,7 @@ export const createCRUD = <T extends z.ZodObject>(
           const { insertedId } = await details.model.insertOne(
             details.schema.parse({
               ...body,
-              ...opts?.isolationFields?.(req),
+              ...(await opts?.isolationFields?.(req)),
             }) as any,
           );
 
@@ -87,7 +87,7 @@ export const createCRUD = <T extends z.ZodObject>(
           const resultsQuery = details.model.find(
             {
               ...(params.id ? { _id: new ObjectId(params.id) } : {}),
-              ...opts?.isolationFields?.(req),
+              ...(await opts?.isolationFields?.(req)),
             } as any,
           );
 
@@ -123,7 +123,7 @@ export const createCRUD = <T extends z.ZodObject>(
           const { modifiedCount } = await details.model.updateOne(
             {
               _id: new ObjectId(params.id),
-              ...opts?.isolationFields?.(req),
+              ...(await opts?.isolationFields?.(req)),
             } as any,
             body,
           );
@@ -147,7 +147,7 @@ export const createCRUD = <T extends z.ZodObject>(
 
           const { deletedCount } = await details.model.deleteOne({
             _id: new ObjectId(params.id),
-            ...opts?.isolationFields?.(req),
+            ...(await opts?.isolationFields?.(req)),
           } as any);
 
           if (!deletedCount) throw new Error("No record deleted!");

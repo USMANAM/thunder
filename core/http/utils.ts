@@ -18,10 +18,12 @@ export const queryAsJson = (req: Request, opts?: IParseOptions) => {
 };
 
 export const bodyAsJson = async (req: Request) => {
+  const raw = await req.text();
+
   try {
-    return await req.json();
+    return JSON.parse(raw);
   } catch {
-    return Object.fromEntries(new URLSearchParams(await req.text()));
+    return Object.fromEntries(new URLSearchParams(raw));
   }
 };
 

@@ -137,4 +137,4 @@ dist
 
 # Development Source
 _temp/
-!public/sdk@*/www/package.tgz
+!public/www/sdk@*/package.tgz
