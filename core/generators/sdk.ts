@@ -38,7 +38,7 @@ export const routerToMethods = (router: Router, opts?: {
   const auxiliaryTypeStore = createAuxiliaryTypeStore();
   const methods: Record<string, TSDKMethodDetails> = {};
 
-  for (const [endpoint, { methods: httpMethods }] of router["registry"]) {
+  for (const [_, { fullPath, methods: httpMethods }] of router["registry"]) {
     for (const [httpMethod, { name, handler }] of Object.entries(httpMethods)) {
       let shapes: THandlerIOShapes | undefined;
 
@@ -48,7 +48,7 @@ export const routerToMethods = (router: Router, opts?: {
 
       methods[name] = {
         method: httpMethod as TMethod,
-        endpoint,
+        endpoint: fullPath,
         shapes,
         types: {},
       };

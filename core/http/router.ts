@@ -40,11 +40,14 @@ export type TRegisterFn = (
 ) => void;
 
 export class Router {
+  protected rootPath?: string;
   protected parser?: MatchFunction<Record<string, string>>;
   protected methodNames = new Set<string>();
   protected registry: Map<
     string,
     {
+      fullPath: string;
+      endpoint: string;
       parser: MatchFunction<Record<string, string>>;
       methods: {
         [K in TMethod]?: {
@@ -90,11 +93,19 @@ export class Router {
     this.name = fn.name;
 
     if (rootPath) {
+      this.rootPath = rootPath;
       this.parser = match(`/${rootPath.replace(/^\/|\/$/g, "")}{*__endpoint}`);
     }
 
     // deno-lint-ignore no-explicit-any
     fn(this as any);
+  }
+
+  protected toFullPath(endpoint: string) {
+    return "/" + [
+      this.rootPath?.replace(/^\/|\/$/g, ""),
+      endpoint.replace(/^\/|\/$/g, ""),
+    ].filter(Boolean).join("/");
   }
 
   protected registerMethod(
@@ -120,6 +131,8 @@ export class Router {
 
     if (!routing) {
       this.registry.set(endpoint, {
+        fullPath: this.toFullPath(endpoint),
+        endpoint,
         parser: match(endpoint),
         methods: {
           [resolvedMethod]: {
