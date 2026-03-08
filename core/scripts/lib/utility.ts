@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { Buffer } from "node:buffer";
 import { ensureDir } from "@std/fs/ensure-dir";
 import { dirname, resolve } from "@std/path";
+import { deepMerge } from "@std/collections/deep-merge";
 
 export const printStream = async (stream: ReadableStream<Uint8Array>) => {
   const Output: string[] = [];
@@ -99,3 +100,26 @@ export const symlink = async (target: string, linkPath: string) => {
     await Deno.symlink(absTarget, absLink, { type: "dir" });
   }
 };
+
+export function deepMergeUnique<T extends Record<PropertyKey, unknown>>(
+  a: T,
+  b: T,
+): T {
+  const merged = deepMerge(a, b);
+
+  function fix(value: any): any {
+    if (Array.isArray(value)) {
+      return [...new Set(value.map(fix))];
+    }
+
+    if (value && typeof value === "object") {
+      for (const k in value) {
+        value[k] = fix(value[k]);
+      }
+    }
+
+    return value;
+  }
+
+  return fix(merged);
+}

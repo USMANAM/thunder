@@ -1,8 +1,7 @@
 import { parseArgs as parse } from "@std/cli/parse-args";
 import { dirname, join, toFileUrl } from "@std/path";
-import { deepMerge } from "@std/collections";
 import { existsSync, expandGlob } from "@std/fs";
-import { printStream } from "./lib/utility.ts";
+import { deepMergeUnique, printStream } from "./lib/utility.ts";
 import { z } from "zod";
 
 import { Confirm } from "@cliffy/prompt";
@@ -28,7 +27,7 @@ export const mergeDenoConfig = async (dir: string) => {
 
   const MainConfig = await getDenoConfig();
 
-  const ResultConfig = deepMerge(MainConfig, TempConfig);
+  const ResultConfig = deepMergeUnique(MainConfig, TempConfig);
 
   delete ResultConfig.id;
   delete ResultConfig.version;
@@ -154,7 +153,7 @@ export const updateCore = async (options: {
     // Update Code Snippets
     await Deno.copyFile(
       join(TempPath, ".vscode/thunder.code-snippets"),
-      join(Deno.cwd(), ".vscode/new.thunder.code-snippets"),
+      join(Deno.cwd(), ".vscode/thunder.code-snippets"),
     );
 
     // Update Docs File
