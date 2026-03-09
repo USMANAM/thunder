@@ -1,5 +1,5 @@
 import z, { ZodError } from "zod";
-import { match, MatchFunction } from "path-to-regexp";
+import { match, MatchFunction, MatchResult } from "path-to-regexp";
 import { THook } from "./hooks.ts";
 import { paramsMap } from "./constants.ts";
 import { Env, EnvType } from "../utils/env.ts";
@@ -102,10 +102,8 @@ export class Router {
   }
 
   protected toFullPath(endpoint: string) {
-    return "/" + [
-      this.rootPath?.replace(/^\/|\/$/g, ""),
-      endpoint.replace(/^\/|\/$/g, ""),
-    ].filter(Boolean).join("/");
+    return "/" + this.rootPath?.replace(/^\/|\/$/g, "") +
+      endpoint;
   }
 
   protected registerMethod(
@@ -203,6 +201,58 @@ export class Router {
     }
   };
 
+  protected handle = (
+    details?: {
+      name?: string;
+      handler?: TPreparedHandler;
+    },
+    match?: MatchResult<Record<string, string>>,
+  ) => {
+    return async (req: Request, ...hooks: THook[]) => {
+      return await this.tryHandle(async () => {
+        const res = await this.tryHandle(async () => {
+          for (const hook of hooks) {
+            if (typeof hook.pre === "function") {
+              const hookRes = await hook.pre({
+                req,
+                scope: this.name,
+                name: details?.name,
+              });
+
+              if (hookRes instanceof Response) return hookRes;
+            }
+          }
+
+          match && paramsMap.set(req, match.params);
+
+          const handler = details?.handler;
+
+          if (typeof handler === "function") {
+            return await handler(req);
+          } else {
+            return await handler?.handler(req) ??
+              new Response("Request handler not found", { status: 404 });
+          }
+        });
+
+        for (const hook of hooks) {
+          if (typeof hook.post === "function") {
+            const hookRes = await hook.post({
+              req,
+              res,
+              scope: this.name,
+              name: details?.name,
+            });
+
+            if (hookRes instanceof Response) return hookRes;
+          }
+        }
+
+        return res;
+      });
+    };
+  };
+
   public route(method: TMethod, endpoint: string) {
     let targetEndpoint = endpoint;
 
@@ -221,54 +271,13 @@ export class Router {
 
       if (!match) continue;
 
-      const handlerObj = routing.methods[method] || routing.methods["all"] ||
-        { name: undefined, handler: undefined };
+      const handlerObj = routing.methods[method] || routing.methods["all"];
 
       if (handlerObj) {
-        return async (req: Request, ...hooks: THook[]) => {
-          return await this.tryHandle(async () => {
-            const res = await this.tryHandle(async () => {
-              for (const hook of hooks) {
-                if (typeof hook.pre === "function") {
-                  const hookRes = await hook.pre({
-                    req,
-                    scope: this.name,
-                    name: handlerObj.name,
-                  });
-
-                  if (hookRes instanceof Response) return hookRes;
-                }
-              }
-
-              paramsMap.set(req, match.params);
-
-              const handler = handlerObj.handler;
-
-              if (typeof handler === "function") {
-                return await handler(req);
-              } else {
-                return await handler?.handler(req) ??
-                  new Response("Not found", { status: 404 });
-              }
-            });
-
-            for (const hook of hooks) {
-              if (typeof hook.post === "function") {
-                const hookRes = await hook.post({
-                  req,
-                  res,
-                  scope: this.name,
-                  name: handlerObj.name,
-                });
-
-                if (hookRes instanceof Response) return hookRes;
-              }
-            }
-
-            return res;
-          });
-        };
+        return this.handle(handlerObj, match);
       }
     }
+
+    return this.handle();
   }
 }

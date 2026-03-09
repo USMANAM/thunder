@@ -105,7 +105,7 @@ export const createCRUD = <T extends z.ZodObject>(
     id: z.string(),
   });
 
-  if (opts?.disable?.update) {
+  if (!opts?.disable?.update) {
     details.router.patch("/:id", function update() {
       const $body =
         (details.updateSchema ?? details.insertSchema ?? details.schema)
@@ -136,7 +136,7 @@ export const createCRUD = <T extends z.ZodObject>(
     });
   }
 
-  if (opts?.disable?.del) {
+  if (!opts?.disable?.del) {
     details.router.del("/:id", function del() {
       return {
         shape: () => ({
