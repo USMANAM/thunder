@@ -7,6 +7,7 @@ import { join } from "@std/path/posix/join";
 import { generateModules } from "./sdk.ts";
 import { writeJSONFile } from "../scripts/lib/utility.ts";
 import { toOpenApiPaths } from "./utils/toOpenAPIPaths.ts";
+import z from "zod";
 
 export type TGenerateOpenAPIContentOpts = {
   title?: string;
@@ -32,9 +33,9 @@ export const generateOpenAPIContent = async (
   const tags = new Set<string>();
   const paths: ZodOpenApiPathsObject = {};
 
-  const modules = await generateModules(
+  const { modules } = await generateModules(
     opts?.routesDir ?? "./routes",
-    { cwd },
+    { cwd, skipBuildTypes: true },
   );
 
   for (const [_, moduleDetails] of Object.entries(modules)) {
@@ -100,6 +101,22 @@ export const generateOpenAPIContent = async (
     },
     tags: Array.from(tags).map((name) => ({ name })),
     paths,
+  }, {
+    override: ({ jsonSchema, zodSchema: schema }) => {
+      if ("meta" in schema && typeof schema.meta === "function") {
+        const meta = schema.meta() as Record<string, unknown> | undefined;
+
+        if (schema instanceof z.ZodCustom) {
+          let type = "string";
+
+          if (typeof meta?.tsType === "string") {
+            type = meta.tsType;
+          }
+
+          jsonSchema.type = type as typeof jsonSchema.type;
+        }
+      }
+    },
   });
 
   if (!opts.skipWrite) {

@@ -135,7 +135,10 @@ export type TSDKModuleDetails = {
 
 export const generateModules = async (
   routesDir: string,
-  opts?: { cwd?: string },
+  opts?: {
+    cwd?: string;
+    skipBuildTypes?: boolean;
+  },
 ) => {
   const modules: Record<string, TSDKModuleDetails> = {};
 
@@ -151,7 +154,7 @@ export const generateModules = async (
 
     const { default: router } = await import(toFileUrl(entry.path).href);
 
-    const methods = routerToMethods(router);
+    const methods = routerToMethods(router, opts);
 
     modules[entry.name] = {
       name: router.name,
