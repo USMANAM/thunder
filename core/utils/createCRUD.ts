@@ -13,22 +13,33 @@ export type TCrudDetails<T extends z.ZodObject> = {
   updateSchema?: z.ZodObject;
 };
 
-export type TCrudOptions<T extends z.ZodObject> = {
+export type TCrudIsolation<T> = (req: Request) =>
+  | {
+    [K in keyof T]?: unknown;
+  }
+  | Promise<
+    {
+      [K in keyof T]?: unknown;
+    }
+  >;
+
+export type TCrudProjection<T> =
+  & {
+    [K in keyof T]?: number;
+  }
+  & {
+    [K in string]?: number;
+  };
+
+export type TCrudOptions<T extends z.ZodObject, D = z.infer<T>> = {
   disable?: {
     create?: boolean;
     get?: boolean;
     update?: boolean;
     del?: boolean;
   };
-  isolationFields?: (req: Request) =>
-    | {
-      [K in keyof z.infer<T>]?: unknown;
-    }
-    | Promise<
-      {
-        [K in keyof z.infer<T>]?: unknown;
-      }
-    >;
+  projection?: TCrudProjection<D> | Array<TCrudProjection<D>>;
+  isolationFields?: TCrudIsolation<D>;
 };
 
 export const createCRUD = <T extends z.ZodObject>(
@@ -84,12 +95,19 @@ export const createCRUD = <T extends z.ZodObject>(
         handler: async (req: Request) => {
           const params = $params.parse(paramsAsJson(req));
 
-          const resultsQuery = details.model.find(
+          const resultsQuery = details.model.aggregate([
             {
-              ...(params.id ? { _id: new ObjectId(params.id) } : {}),
-              ...(await opts?.isolationFields?.(req)),
-            } as any,
-          );
+              $match: {
+                ...(params.id ? { _id: new ObjectId(params.id) } : {}),
+                ...(await opts?.isolationFields?.(req)),
+              } as any,
+            },
+            ...(opts?.projection
+              ? Array.isArray(opts.projection)
+                ? opts.projection.map(($project) => ({ $project }))
+                : [{ $project: opts.projection }]
+              : []),
+          ]);
 
           return Response.json(
             {
