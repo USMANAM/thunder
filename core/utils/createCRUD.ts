@@ -1,14 +1,14 @@
-// deno-lint-ignore-file no-explicit-any
+// deno-lint-ignore-file no-explicit-any ban-ts-comment
 import { TRouter } from "@/core/http/router.ts";
 import z from "zod";
-import { bodyAsJson, paramsAsJson } from "@/core/http/utils.ts";
+import { bodyAsJson, paramsAsJson, queryAsJson } from "@/core/http/utils.ts";
 import { Collection, ObjectId } from "mongodb";
 import { Response } from "@/core/http/response.ts";
 
 export type TCrudDetails<T extends z.ZodObject> = {
   router: TRouter;
   schema: T;
-  model: Collection<z.infer<T>>;
+  model: Collection<z.output<T>>;
   insertSchema?: z.ZodObject;
   updateSchema?: z.ZodObject;
 };
@@ -31,10 +31,11 @@ export type TCrudProjection<T> =
     [K in string]?: number;
   };
 
-export type TCrudOptions<T extends z.ZodObject, D = z.infer<T>> = {
+export type TCrudOptions<T extends z.ZodObject, D = z.output<T>> = {
   disable?: {
     create?: boolean;
     get?: boolean;
+    count?: boolean;
     update?: boolean;
     del?: boolean;
   };
@@ -76,11 +77,35 @@ export const createCRUD = <T extends z.ZodObject>(
     });
   }
 
+  if (!opts?.disable?.count) {
+    details.router.get("/count", function count() {
+      const $return = z.object({
+        count: z.number(),
+      });
+
+      return {
+        shape: () => ({
+          return: $return,
+        }),
+        handler: async (req: Request) => {
+          const count = await details.model.countDocuments(
+            await opts?.isolationFields?.(req) as any,
+          );
+
+          return Response.json({ count } satisfies z.output<typeof $return>);
+        },
+      };
+    });
+  }
+
+  const emptyArray: any[] = [];
+
   if (!opts?.disable?.get) {
     details.router.get("{/:id}", function get() {
       const $params = z.object({
         id: z.string().optional(),
       });
+      const $query = paginationSchema;
       const $return = z.object({
         results: z.array(details.schema.extend({
           _id: z.string(),
@@ -90,10 +115,12 @@ export const createCRUD = <T extends z.ZodObject>(
       return {
         shape: () => ({
           params: $params,
+          query: $query,
           return: $return,
         }),
         handler: async (req: Request) => {
           const params = $params.parse(paramsAsJson(req));
+          const query = $query.parse(queryAsJson(req));
 
           const resultsQuery = details.model.aggregate([
             {
@@ -106,7 +133,16 @@ export const createCRUD = <T extends z.ZodObject>(
               ? Array.isArray(opts.projection)
                 ? opts.projection.map(($project) => ({ $project }))
                 : [{ $project: opts.projection }]
-              : []),
+              : emptyArray),
+            ...(query.filters
+              ? [{
+                $match: normalizeFilters(query.filters),
+              }]
+              : emptyArray),
+            ...(query.sort ? [{ $sort: query.sort }] : emptyArray),
+            ...(query.offset ? [{ $skip: query.offset }] : emptyArray),
+            ...(query.limit ? [{ $limit: query.limit }] : emptyArray),
+            ...(query.project ? [{ $project: query.project }] : emptyArray),
           ]);
 
           return Response.json(
@@ -143,7 +179,9 @@ export const createCRUD = <T extends z.ZodObject>(
               _id: new ObjectId(params.id),
               ...(await opts?.isolationFields?.(req)),
             } as any,
-            body,
+            {
+              $set: body as any,
+            },
           );
 
           if (!modifiedCount) throw new Error("No record updated!");
@@ -175,4 +213,282 @@ export const createCRUD = <T extends z.ZodObject>(
       };
     });
   }
+};
+
+export const clientValueSchema = z.union([
+  z.object({
+    type: z.enum(
+      [
+        "string",
+        "number",
+        "boolean",
+        "objectId",
+        "date",
+        "regex",
+        "null",
+      ],
+    ),
+    value: z.string(),
+    options: z.object({
+      regexFlags: z.string().optional(),
+    }).optional(),
+  }),
+  z.string(),
+]).meta({ tsLabel: "TFilterValue" });
+
+export const expressionSchema = z.object({
+  $exists: clientValueSchema,
+  $eq: clientValueSchema,
+  $ne: clientValueSchema,
+  $gt: clientValueSchema,
+  $gte: clientValueSchema,
+  $lt: clientValueSchema,
+  $lte: clientValueSchema,
+  $mod: z.tuple([z.number(), z.number()]),
+  $regex: clientValueSchema,
+  $in: z.array(clientValueSchema),
+  $nin: z.array(clientValueSchema),
+  $all: z.array(clientValueSchema),
+}).partial().meta({ tsLabel: "TFilterExpression" });
+
+export const basicFilterSchema = z.record(
+  z.string(),
+  z.union([z.object({ $not: expressionSchema }), expressionSchema]),
+).meta({ tsLabel: "TBasicFilter" });
+
+export const multiFilterSchema = z.object({
+  $and: z.array(basicFilterSchema),
+  $or: z.array(basicFilterSchema),
+}).partial().meta({ tsLabel: "TMultiFilters" });
+
+export const filtersSchema = z.union([basicFilterSchema, multiFilterSchema])
+  .meta({ tsLabel: "TFilters" });
+
+export const paginationSchema = z.object(
+  {
+    filters: filtersSchema.optional().describe("Client side filters"),
+    offset: z.number().min(0).default(0),
+    limit: z.number().min(1).max(2000).default(2000),
+    sort: z.record(z.string(), z.number().min(-1).max(1)).default({ _id: -1 })
+      .describe(
+        "Provide a sorting information in mongodb sort object format",
+      ),
+    project: z.record(z.string(), z.number().min(0).max(1)).optional().describe(
+      "Provide a projection information in mongodb project object format",
+    ),
+  },
+).meta({ tsLabel: "TPagination" });
+
+export const normalizeFilterExpression = (
+  value?: string | number | boolean | z.output<typeof clientValueSchema>,
+) => {
+  if (typeof value === "object" && typeof value.type === "string") {
+    switch (value.type) {
+      case "boolean":
+        return ["true", "1"].includes(value.value);
+
+      case "date":
+        return value.value === "now" ? new Date() : new Date(value.value);
+
+      case "number":
+        return Number(value.value);
+
+      case "objectId":
+        return new ObjectId(value.value);
+
+      case "regex":
+        return new RegExp(value.value, value.options?.regexFlags);
+
+      case "null":
+        return null;
+
+      default:
+        return value.value;
+    }
+  }
+
+  return value;
+};
+
+export const normalizeFilters = (
+  filters?: z.output<typeof filtersSchema>,
+) => {
+  if (typeof filters !== "object" || !filters) return {};
+
+  const transform = (
+    expr:
+      | { $not: z.output<typeof expressionSchema> }
+      | z.output<typeof expressionSchema>,
+  ) => {
+    const newExpr: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(expr)) {
+      if (key === "$not") newExpr[key] = transform(value);
+      else {
+        newExpr[key] = value instanceof Array
+          ? value.map(normalizeFilterExpression)
+          : normalizeFilterExpression(value);
+      }
+    }
+
+    return newExpr;
+  };
+
+  const newFilters: Record<string, any> = {};
+
+  for (const [key, expr] of Object.entries(filters)) {
+    if (["$and", "$or"].includes(key)) {
+      newFilters[key] = expr.map(normalizeFilters);
+      continue;
+    }
+
+    newFilters[key] = transform(expr);
+  }
+
+  return newFilters;
+};
+
+export const testFilters = <T extends Record<string, unknown>>(
+  filters: z.output<typeof filtersSchema> | string,
+  data: T,
+) => {
+  const validatedFilters = typeof filters === "string"
+    ? JSON.parse(filters) as z.output<typeof filtersSchema>
+    : filters;
+
+  const testExpression = (
+    expressions: z.output<typeof expressionSchema>,
+    key: string,
+  ) => {
+    let success = true;
+
+    for (const [operator, expression] of Object.entries(expressions)) {
+      if (!success) break;
+
+      const exists = key in data;
+      const value = data[key];
+
+      try {
+        if (Array.isArray(expression)) {
+          const targets = expression.map(normalizeFilterExpression).map(String);
+
+          switch (operator) {
+            case "$in":
+              success = targets.includes(String(value));
+              break;
+            case "$nin":
+              success = !targets.includes(String(value));
+              break;
+            case "$all":
+              success = !targets.every((target) => target === String(value));
+              break;
+
+            default:
+              success = false;
+              break;
+          }
+        } else {
+          const target = normalizeFilterExpression(expression);
+
+          switch (operator) {
+            case "$exists":
+              success = exists === Boolean(target);
+              break;
+            case "$eq":
+              success = String(value) === String(target);
+              break;
+            case "$ne":
+              success = String(value) !== String(target);
+              break;
+            case "$gt":
+              // @ts-ignore
+              success = value > target;
+              break;
+            case "$gte":
+              // @ts-ignore
+              success = value >= target;
+              break;
+            case "$lt":
+              // @ts-ignore
+              success = value < target;
+              break;
+            case "$lte":
+              // @ts-ignore
+              success = value <= target;
+              break;
+            case "$mod":
+              // @ts-ignore
+              success = value % target[0] === target[1];
+              break;
+            case "$regex":
+              // @ts-ignore
+              success = RegExp(target).test(value);
+              break;
+
+            default:
+              success = false;
+              break;
+          }
+        }
+      } catch {
+        success = false;
+      }
+    }
+
+    return success;
+  };
+
+  const testBasicFilters = (
+    basicFilters: z.output<typeof basicFilterSchema>,
+  ) => {
+    let success = true;
+
+    for (const [key, expression] of Object.entries(basicFilters)) {
+      if (!success) break;
+
+      if ("$not" in expression) {
+        success = !testExpression(expression["$not"], key);
+
+        continue;
+      }
+
+      success = testExpression(expression, key);
+    }
+
+    return success;
+  };
+
+  let pass = true;
+
+  if ("$and" in validatedFilters && Array.isArray(validatedFilters["$and"])) {
+    for (const filters of validatedFilters["$and"]) {
+      const success = testFilters(filters, data);
+
+      if (!success) {
+        pass = false;
+
+        break;
+      }
+    }
+  }
+
+  if (!pass) return false;
+
+  if ("$or" in validatedFilters && Array.isArray(validatedFilters["$or"])) {
+    for (const filters of validatedFilters["$or"]) {
+      const success = testFilters(filters, data);
+
+      if (success) return true;
+    }
+
+    return false;
+  }
+
+  if (!("$and" in validatedFilters) && !("$or" in validatedFilters)) {
+    return testBasicFilters(
+      validatedFilters as z.output<typeof basicFilterSchema>,
+    );
+  }
+
+  return false;
 };

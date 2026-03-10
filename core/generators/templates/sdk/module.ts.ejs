@@ -1,4 +1,9 @@
-import type { TRequestOptions } from "../types.ts";
+import type { 
+    TRequestOptions,
+<% for (const [type] of types.entries()) { -%>
+    <%- type %>,
+<% } -%>
+} from "../types.ts";
 import type { BaseSDK } from "../base.ts";
 
 import { compile } from "path-to-regexp";

@@ -29,3 +29,7 @@ export type TRequestOptions<T> = {
     >;
     signal?: AbortSignal
 } & TCacheOptions<T>;
+
+<% for (const [, typeDef] of types.entries()) { -%>
+export <%- typeDef %>
+<% } -%>

@@ -9,6 +9,7 @@ import z from "zod";
 import {
   createAuxiliaryTypeStore,
   createTypeAlias,
+  OptionalTypeOverrideFunction,
   printNode,
   zodToTs,
 } from "@oridune/zod-to-ts";
@@ -31,6 +32,8 @@ export type TSDKMethodDetails = {
     return?: string;
   };
 };
+
+const globalTypesMap = new Map<string, string>();
 
 export const routerToMethods = (router: Router, opts?: {
   skipBuildTypes?: boolean;
@@ -63,12 +66,17 @@ export const routerToMethods = (router: Router, opts?: {
           if (!shape) continue;
           if (skipBody && key === "body") continue;
 
-          const { node } = zodToTs(shape, {
-            auxiliaryTypeStore,
-            overrideFunction: (schema, ts) => {
-              if (schema instanceof z.ZodCustom) {
-                const meta = schema.meta();
+          const overrideFunction: (
+            root?: z.z.core.$ZodType,
+          ) => OptionalTypeOverrideFunction = (root) =>
+          (
+            schema,
+            ts,
+          ) => {
+            if ("meta" in schema && typeof schema.meta === "function") {
+              const meta = schema.meta() as Record<string, unknown> | undefined;
 
+              if (schema instanceof z.ZodCustom) {
                 let type = "unknown";
 
                 if (typeof meta?.tsType === "string") {
@@ -79,14 +87,39 @@ export const routerToMethods = (router: Router, opts?: {
                   ts.factory.createIdentifier(type),
                 );
               }
-            },
+
+              if (
+                typeof meta?.tsLabel === "string" &&
+                root !== schema
+              ) {
+                if (!globalTypesMap.has(meta.tsLabel)) {
+                  const { node } = zodToTs(schema, {
+                    auxiliaryTypeStore,
+                    overrideFunction: overrideFunction(schema),
+                    io: key === "return" ? "output" : "input",
+                  });
+
+                  const typeAlias = createTypeAlias(node, meta.tsLabel);
+
+                  globalTypesMap.set(meta.tsLabel, printNode(typeAlias));
+                }
+
+                return ts.factory.createTypeReferenceNode(
+                  ts.factory.createIdentifier(meta.tsLabel),
+                );
+              }
+            }
+          };
+
+          const { node } = zodToTs(shape, {
+            auxiliaryTypeStore,
+            overrideFunction: overrideFunction(),
+            io: key === "return" ? "output" : "input",
           });
 
           const typeAlias = createTypeAlias(node, `${name}$${key}`);
 
-          const typeString = printNode(typeAlias);
-
-          methods[name].types[key] = typeString;
+          methods[name].types[key] = printNode(typeAlias);
         }
       }
     }
@@ -126,7 +159,7 @@ export const generateModules = async (
     };
   }
 
-  return modules;
+  return { modules, globalTypesMap };
 };
 
 export interface IPackageJSON {
@@ -296,7 +329,7 @@ export const generateSDKContent = async (
 
   const files: Record<string, string> = {};
 
-  const modules = await generateModules(
+  const { modules, globalTypesMap } = await generateModules(
     opts?.routesDir ?? "./routes",
     { cwd },
   );
@@ -338,13 +371,17 @@ export const generateSDKContent = async (
           ...context,
           ...details,
           filename,
+          types: globalTypesMap,
         },
       );
     }),
   );
 
   files["base.ts"] = await ejsRender(baseTemplate, context);
-  files["types.ts"] = await ejsRender(typesTemplate, context);
+  files["types.ts"] = await ejsRender(typesTemplate, {
+    ...context,
+    types: globalTypesMap,
+  });
   files["deno.json"] = await ejsRender(denoJsonTemplate, context);
 
   const { pluginNames, pluginFiles } = await syncPluginContent({
