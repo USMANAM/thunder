@@ -15,6 +15,12 @@ import { <%- pluginName %>Entry } from "./plugins/<%- pluginName %>/entry.ts";
 <% } -%>
 
 export class ThunderSDK extends BaseSDK {
+    static __moduleNames = [
+<% for (const [, { name }] of Object.entries(modulesToImport)) { -%>
+        "<%- name %>",
+<% } -%>
+    ];
+    
 <% for (const [, { name }] of Object.entries(modulesToImport)) { -%>
     static <%- name %> = <%- name %>Module(this);
 <% } -%>
