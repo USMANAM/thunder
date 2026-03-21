@@ -1,4 +1,4 @@
-import { expandGlob } from "@std/fs";
+import { expandGlob } from "@std/fs/expand-glob";
 import { basename } from "@std/path/basename";
 import { join } from "@std/path/join";
 import { toFileUrl } from "@std/path/to-file-url";
@@ -9,37 +9,36 @@ export const loadRoutes = (
   globPattern: string,
   target: string,
 ) => {
-  const cacheKey = root + globPattern + target;
+  const cacheKey = JSON.stringify([root, globPattern, target]);
 
-  let routesPromise = routesCache.get(cacheKey);
+  if (!routesCache.has(cacheKey)) {
+    const rootDir = join(Deno.cwd(), root);
 
-  if (routesPromise !== undefined) return routesPromise;
+    routesCache.set(
+      cacheKey,
+      (async () => {
+        for await (
+          const entry of expandGlob(globPattern, {
+            followSymlinks: true,
+            canonicalize: true,
+            globstar: true,
+            root: rootDir,
+          })
+        ) {
+          if (target === basename(entry.path)) {
+            return {
+              module: await import(toFileUrl(entry.path).href),
+            };
+          }
+        }
 
-  const rootDir = join(Deno.cwd(), root);
-
-  routesPromise = (async () => {
-    for await (
-      const entry of expandGlob(globPattern, {
-        followSymlinks: true,
-        canonicalize: true,
-        globstar: true,
-        root: rootDir,
-      })
-    ) {
-      if (target === basename(entry.path)) {
         return {
-          module: await import(toFileUrl(entry.path).href),
+          fallback: true,
+          module: await import(toFileUrl(join(rootDir, "index.ts")).href),
         };
-      }
-    }
+      })(),
+    );
+  }
 
-    return {
-      fallback: true,
-      module: await import(toFileUrl(join(rootDir, "index.ts")).href),
-    };
-  })();
-
-  routesCache.set(cacheKey, routesPromise);
-
-  return routesPromise;
+  return routesCache.get(cacheKey)!;
 };

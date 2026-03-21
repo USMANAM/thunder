@@ -102,7 +102,7 @@ export class Router {
   }
 
   protected toFullPath(endpoint: string) {
-    return "/" + this.rootPath?.replace(/^\/|\/$/g, "") +
+    return "/" + (this.rootPath?.replace(/^\/|\/$/g, "") ?? "") +
       endpoint;
   }
 
@@ -127,6 +127,9 @@ export class Router {
 
     const routing = this.registry.get(endpoint);
 
+    // prepare() runs once at registration (handler + shape snapshot).
+    const preparedHandler = prepare();
+
     if (!routing) {
       this.registry.set(endpoint, {
         fullPath: this.toFullPath(endpoint),
@@ -135,7 +138,7 @@ export class Router {
         methods: {
           [resolvedMethod]: {
             name: prepare.name,
-            handler: prepare(),
+            handler: preparedHandler,
           },
         },
       });
@@ -151,7 +154,7 @@ export class Router {
 
     routing.methods[resolvedMethod] = {
       name: prepare.name,
-      handler: prepare(),
+      handler: preparedHandler,
     };
 
     return this;
@@ -201,39 +204,57 @@ export class Router {
     }
   };
 
+  protected async runPreHooksAndHandler(
+    req: Request,
+    hooks: THook[],
+    details:
+      | {
+        name?: string;
+        handler?: TPreparedHandler;
+      }
+      | undefined,
+    routeMatch: MatchResult<Record<string, string>> | undefined,
+  ): Promise<Response> {
+    for (const hook of hooks) {
+      if (typeof hook.pre === "function") {
+        const hookRes = await hook.pre({
+          req,
+          scope: this.name,
+          name: details?.name,
+        });
+
+        if (hookRes instanceof Response) return hookRes;
+      }
+    }
+
+    if (routeMatch) {
+      paramsMap.set(req, routeMatch.params);
+    } else {
+      paramsMap.delete(req);
+    }
+
+    const handler = details?.handler;
+
+    if (typeof handler === "function") {
+      return await handler(req);
+    }
+
+    return await handler?.handler(req) ??
+      new Response("Request handler not found", { status: 404 });
+  }
+
   protected handle = (
     details?: {
       name?: string;
       handler?: TPreparedHandler;
     },
-    match?: MatchResult<Record<string, string>>,
+    routeMatch?: MatchResult<Record<string, string>>,
   ) => {
     return async (req: Request, ...hooks: THook[]) => {
       return await this.tryHandle(async () => {
-        const res = await this.tryHandle(async () => {
-          for (const hook of hooks) {
-            if (typeof hook.pre === "function") {
-              const hookRes = await hook.pre({
-                req,
-                scope: this.name,
-                name: details?.name,
-              });
-
-              if (hookRes instanceof Response) return hookRes;
-            }
-          }
-
-          match && paramsMap.set(req, match.params);
-
-          const handler = details?.handler;
-
-          if (typeof handler === "function") {
-            return await handler(req);
-          } else {
-            return await handler?.handler(req) ??
-              new Response("Request handler not found", { status: 404 });
-          }
-        });
+        const res = await this.tryHandle(() =>
+          this.runPreHooksAndHandler(req, hooks, details, routeMatch)
+        );
 
         for (const hook of hooks) {
           if (typeof hook.post === "function") {
@@ -257,24 +278,24 @@ export class Router {
     let targetEndpoint = endpoint;
 
     if (this.parser) {
-      const match = this.parser(endpoint);
+      const routeMatch = this.parser(endpoint);
 
-      if (!match) return;
+      if (!routeMatch) return;
 
       targetEndpoint = "/" +
-        ((match.params.__endpoint as unknown as Array<string> | undefined)
+        ((routeMatch.params.__endpoint as unknown as Array<string> | undefined)
           ?.filter(Boolean).join("/") ?? "");
     }
 
     for (const routing of this.registry.values()) {
-      const match = routing.parser(targetEndpoint);
+      const routeMatch = routing.parser(targetEndpoint);
 
-      if (!match) continue;
+      if (!routeMatch) continue;
 
       const handlerObj = routing.methods[method] || routing.methods["all"];
 
       if (handlerObj) {
-        return this.handle(handlerObj, match);
+        return this.handle(handlerObj, routeMatch);
       }
     }
 

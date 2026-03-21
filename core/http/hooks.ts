@@ -26,40 +26,44 @@ export const loadHooks = (
   root: string,
   globPattern: string,
 ): Promise<THook[]> => {
-  const cacheKey = root + globPattern;
+  const cacheKey = JSON.stringify([root, globPattern]);
 
-  let hooksPromise = hooksCache.get(cacheKey);
+  if (!hooksCache.has(cacheKey)) {
+    const rootDir = join(Deno.cwd(), root);
 
-  if (hooksPromise !== undefined) return hooksPromise;
+    hooksCache.set(
+      cacheKey,
+      (async () => {
+        const hooks: THook[] = [];
 
-  // Store the promise immediately so concurrent calls await the same promise
-  hooksPromise = (async () => {
-    const hooks: THook[] = [];
+        for await (
+          const entry of expandGlob(globPattern, {
+            followSymlinks: true,
+            canonicalize: true,
+            globstar: true,
+            root: rootDir,
+          })
+        ) {
+          if (entry.isFile) {
+            const mod = await import(toFileUrl(entry.path).href);
+            const d = mod.default;
 
-    for await (
-      const entry of expandGlob(globPattern, {
-        followSymlinks: true,
-        canonicalize: true,
-        globstar: true,
-        root: join(Deno.cwd(), root),
-      })
-    ) {
-      if (entry.isFile) {
-        const mod = await import(toFileUrl(entry.path).href);
+            if (
+              d != null &&
+              typeof d === "object" &&
+              ("pre" in d || "post" in d)
+            ) {
+              hooks.push(d as THook);
+            }
+          }
+        }
 
-        if (
-          typeof mod.default === "object" &&
-          ("pre" in mod.default || "post" in mod.default)
-        ) hooks.push(mod.default);
-      }
-    }
+        hooks.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
-    hooks.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+        return hooks;
+      })(),
+    );
+  }
 
-    return hooks;
-  })();
-
-  hooksCache.set(cacheKey, hooksPromise);
-
-  return hooksPromise;
+  return hooksCache.get(cacheKey)!;
 };
