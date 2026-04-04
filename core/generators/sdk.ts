@@ -130,6 +130,7 @@ export const routerToMethods = (router: Router, opts?: {
 
 export type TSDKModuleDetails = {
   name: string;
+  metadata?: Record<string, unknown>;
   methods: Record<string, TSDKMethodDetails>;
 };
 
@@ -158,6 +159,7 @@ export const generateModules = async (
 
     modules[entry.name] = {
       name: router.name,
+      metadata: router.metadata,
       methods,
     };
   }

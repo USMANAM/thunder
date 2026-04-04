@@ -35,6 +35,23 @@ export type TRouter = Record<
   TRegisterMethod
 >;
 
+export type TRouteMetadataValue =
+  | string
+  | number
+  | boolean
+  | { [key: string]: TRouteMetadataValue }
+  | TRouteMetadataValue[];
+
+export type TRouteMetadata = {
+  [key: string]: TRouteMetadataValue;
+};
+
+export type TRouteOptions = {
+  root: string;
+  metadata?: TRouteMetadata;
+  registerFn: TRegisterFn;
+};
+
 export type TRegisterFn = (
   router: TRouter,
 ) => void;
@@ -59,6 +76,7 @@ export class Router {
   > = new Map();
 
   public name: string;
+  public metadata?: TRouteMetadata;
 
   constructor(
     registerFn: TRegisterFn,
@@ -68,16 +86,28 @@ export class Router {
     registerFn: TRegisterFn,
   );
   constructor(
-    root: string | TRegisterFn,
+    opts: TRouteOptions,
+  );
+  constructor(
+    opts: string | TRegisterFn | TRouteOptions,
     registerFn?: TRegisterFn,
   ) {
     let rootPath: string | undefined;
     let fn: TRegisterFn;
 
-    if (typeof root === "function") {
-      fn = root;
+    if (typeof opts === "function") {
+      fn = opts;
+    } else if (typeof opts === "object") {
+      rootPath = opts.root;
+
+      if (!opts.registerFn) {
+        throw new Error("Register function must be provided!");
+      }
+
+      fn = opts.registerFn;
+      this.metadata = opts.metadata;
     } else {
-      rootPath = root;
+      rootPath = opts;
 
       if (!registerFn) {
         throw new Error("Register function must be provided!");

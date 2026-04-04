@@ -23,6 +23,8 @@ export <%- types.return %>
 <% } -%>
 <% } -%>
 
+export const <%- name %>Metadata = <%- JSON.stringify(metadata || {}) %>;
+
 export const <%- name %>Module = (sdk: typeof BaseSDK) => {
     const methods = {
 <% for (const [methodName, { types, method, endpoint }] of Object.entries(methods)) { -%>
