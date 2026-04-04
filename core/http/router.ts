@@ -47,7 +47,7 @@ export type TRouteMetadata = {
 };
 
 export type TRouteOptions = {
-  root: string;
+  root?: string;
   metadata?: TRouteMetadata;
   registerFn: TRegisterFn;
 };

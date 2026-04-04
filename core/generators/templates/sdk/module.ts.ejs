@@ -23,7 +23,9 @@ export <%- types.return %>
 <% } -%>
 <% } -%>
 
-export const <%- name %>Metadata = <%- JSON.stringify(metadata || {}) %>;
+<% if(typeof metadata === "object") { -%>
+export const <%- name %>Metadata = <%- JSON.stringify(metadata) %> as const;
+<% } -%>
 
 export const <%- name %>Module = (sdk: typeof BaseSDK) => {
     const methods = {
