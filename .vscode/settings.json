@@ -6,7 +6,8 @@
     "neondatabase",
     "oridune",
     "surrealdb",
-    "treeify"
+    "treeify",
+    "unrepresentable"
   ],
   "deno.enable": true
 }

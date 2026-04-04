@@ -6,7 +6,9 @@ import { Collection, ObjectId } from "mongodb";
 import { Response } from "@/core/http/response.ts";
 
 export type TCrudDetails<T extends z.ZodObject> = {
-  router: TRouter;
+  router: TRouter & {
+    metadata?: Record<string, unknown>;
+  };
   schema: T;
   model: Collection<z.output<T>>;
   insertSchema?: z.ZodObject;
@@ -43,10 +45,42 @@ export type TCrudOptions<T extends z.ZodObject, D = z.output<T>> = {
   isolationFields?: TCrudIsolation<D>;
 };
 
+const resolveJSONSchemaType = (ctx: {
+  zodSchema: z.z.core.$ZodTypes;
+  jsonSchema: z.z.core.JSONSchema.BaseSchema;
+  path: (string | number)[];
+}) => {
+  if (ctx.zodSchema instanceof z.ZodDate) {
+    ctx.jsonSchema.type = "string";
+    ctx.jsonSchema.format = "date-time";
+  }
+};
+
 export const createCRUD = <T extends z.ZodObject>(
   details: TCrudDetails<T>,
   opts?: TCrudOptions<T>,
 ) => {
+  details.router.metadata = {
+    crud: {
+      schema: details.schema.toJSONSchema({
+        io: "output",
+        unrepresentable: "any",
+        override: resolveJSONSchemaType,
+      }),
+      insertSchema: details.insertSchema?.toJSONSchema({
+        io: "input",
+        unrepresentable: "any",
+        override: resolveJSONSchemaType,
+      }),
+      updateSchema: details.updateSchema?.toJSONSchema({
+        io: "input",
+        unrepresentable: "any",
+        override: resolveJSONSchemaType,
+      }),
+    },
+    ...details.router.metadata,
+  };
+
   if (!opts?.disable?.create) {
     details.router.post("/", function create() {
       const $body = details.insertSchema ?? details.schema;
