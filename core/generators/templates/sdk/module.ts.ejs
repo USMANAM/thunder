@@ -59,7 +59,7 @@ export const <%- name %>Module = (sdk: typeof BaseSDK) => {
 <% } -%>
 
 <% if(typeof metadata === "object") { -%>
-    sdk.__moduleMetadata.set(methods, <%- JSON.stringify(metadata) %>);
+    sdk["_moduleMetadata"].set(methods, <%- JSON.stringify(metadata) %>);
 <% } -%>
 
     return methods;
