@@ -15,7 +15,8 @@ import { <%- pluginName %>Entry } from "./plugins/<%- pluginName %>/entry.ts";
 <% } -%>
 
 export class ThunderSDK extends BaseSDK {
-    static __moduleNames = [
+    protected static _actionsList?: string[];
+    protected static _moduleNames = [
 <% for (const [, { name }] of Object.entries(modulesToImport)) { -%>
         "<%- name %>",
 <% } -%>
@@ -29,5 +30,52 @@ export class ThunderSDK extends BaseSDK {
 <% for (const pluginName of pluginsToImport) { -%>
         <%- pluginName %>: <%- pluginName %>Entry,
 <% } -%>
+    }
+
+    static getModuleNames() {
+        return this._moduleNames;
+    }
+
+    static getModule(name: string) {
+        if (!this.getModuleNames().includes(name)) {
+            throw new Error(`Module not found: ${name}`);
+        }
+
+        return this[name as keyof ThunderSDK] as Record<
+            string,
+            (data: unknown) => Promise<unknown>
+        >;
+    }
+
+    static getMetadata(module: object | string) {
+        if (typeof module === "object") {
+            return this._moduleMetadata.get(module);
+        }
+
+        return this._moduleMetadata.get(
+            this.getModule(module),
+        );
+    }
+
+    static listActions(moduleName?: string) {
+        const actions = (() => {
+            if (this._actionsList) return this._actionsList;
+
+            const unpackModules: string[] = [];
+
+            this.getModuleNames().forEach((name) => {
+                Object.keys(this.getModule(name)).forEach((action) => {
+                    unpackModules.push(`${name}.${action}`);
+                });
+            });
+
+            return this._actionsList = unpackModules;
+        })();
+
+        if (moduleName) {
+            return actions.filter((action) => action.startsWith(`${moduleName}.`));
+        }
+
+        return actions;
     }
 }
